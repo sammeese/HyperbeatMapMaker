@@ -1,0 +1,339 @@
+[gd_scene load_steps=9 format=3 uid="uid://dfg5gn03nngaw"]
+
+[ext_resource type="Script" uid="uid://bw22mciltt717" path="res://scripts/midi_editor.gd" id="1_fmcpj"]
+[ext_resource type="Script" uid="uid://cqtp1uih7s1e6" path="res://scripts/timeline_canvas.gd" id="2_hutrh"]
+[ext_resource type="Script" uid="uid://ceai2w8vydhp4" path="res://scripts/circular_preview.gd" id="3_3hibk"]
+[ext_resource type="Shader" uid="uid://sbjc05vr6pco" path="res://resources/shader.gdshader" id="4_gc6mo"]
+[ext_resource type="Script" uid="uid://cot1dggprffr4" path="res://scripts/intropanel.gd" id="5_wbltj"]
+[ext_resource type="Shader" uid="uid://da8dn48bjkg8m" path="res://resources/blur.gdshader" id="6_hdkmi"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
+shader = ExtResource("4_gc6mo")
+shader_parameter/bloom_intensity = 1.9500000926249998
+shader_parameter/threshold = 0.6830000324425
+shader_parameter/bloom_spread = 8.734000367364999
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_c0ied"]
+shader = ExtResource("6_hdkmi")
+shader_parameter/lod = 2.70000012825
+
+[node name="MidiEditor" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_fmcpj")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.043039158, 0.04303915, 0.04303915, 1)
+
+[node name="ColorRect2" type="ColorRect" parent="."]
+custom_minimum_size = Vector2(0, 36.17)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+color = Color(0.24477637, 0.2447764, 0.24477637, 1)
+
+[node name="HSplit" type="HSplitContainer" parent="."]
+clip_children = 1
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/minimum_grab_thickness = 2
+split_offset = 555
+touch_dragger_enabled = true
+
+[node name="Control" type="Control" parent="HSplit"]
+custom_minimum_size = Vector2(0, 570.86)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 1
+
+[node name="TimelinePanel" type="VBoxContainer" parent="HSplit/Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+
+[node name="gap" type="Control" parent="HSplit/Control/TimelinePanel"]
+custom_minimum_size = Vector2(69.51, 34.46)
+layout_mode = 2
+
+[node name="TimelineRuler" type="Control" parent="HSplit/Control/TimelinePanel"]
+custom_minimum_size = Vector2(0, 27.235)
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HSplit/Control/TimelinePanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TimelineCanvas" type="Control" parent="HSplit/Control/TimelinePanel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2_hutrh")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplit/Control/TimelinePanel/ScrollContainer/TimelineCanvas"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AudioPlayer" type="AudioStreamPlayer" parent="HSplit/Control/TimelinePanel"]
+
+[node name="Panel" type="Control" parent="HSplit"]
+layout_mode = 2
+size_flags_horizontal = 2
+mouse_filter = 2
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="HSplit/Panel"]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -256.0
+offset_right = 512.0
+offset_bottom = 256.0
+grow_vertical = 2
+
+[node name="SubViewport" type="SubViewport" parent="HSplit/Panel/SubViewportContainer"]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(720, 512)
+render_target_update_mode = 4
+
+[node name="ColorRect" type="ColorRect" parent="HSplit/Panel/SubViewportContainer/SubViewport"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+color = Color(0.043039158, 0.04303915, 0.04303915, 1)
+
+[node name="HBoxContainer" type="HBoxContainer" parent="HSplit/Panel/SubViewportContainer/SubViewport"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="CircularPreview" type="Control" parent="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer"]
+custom_minimum_size = Vector2(128, 0)
+layout_mode = 2
+size_flags_horizontal = 10
+size_flags_vertical = 4
+script = ExtResource("3_3hibk")
+
+[node name="gap3" type="Control" parent="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer"]
+custom_minimum_size = Vector2(125.575, 0)
+layout_mode = 2
+
+[node name="RichTextLabel" type="RichTextLabel" parent="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+text = "[center][b]Control Guide[/b][/center]
+
+[b]Mouse Controls[/b]
+• [b]Left Click[/b] - Select/place notes
+• [b]Right Click[/b] - Note context menu
+• [b]Middle Click[/b] - Seek to position
+• [b]Shift + Drag[/b] - Box select notes
+• [b]Ctrl + Scroll[/b] - Zoom in/out
+
+[b]Keyboard Shortcuts[/b]
+• [b]Ctrl+C[/b] - Copy selected notes
+• [b]Ctrl+V[/b] - Paste notes at mouse
+• [b]Ctrl+A[/b] - Select all notes
+• [b]Ctrl+Click[/b] - Toggle note selection
+• [b]Delete/Backspace[/b] - Delete selected
+• [b]Escape[/b] - Clear selection
+
+[b]Playback Controls[/b]
+• [b]Play[/b] - Start/stop playback
+• [b]Pause[/b] - Pause/resume
+• Middle-click timeline to scrub
+
+[b]Documentation & Resources[/b]
+• [url=https://dreamware.notion.site/HYPERBEAT-Mod-Creator-Tester-Documentation-288bcbf066c980eca1d1da2a2772938f]Tunnel/Orn Velocity Guide[/url]
+• [url=https://dreamware.notion.site/HYPERBEAT-Mapping-Documentation-277bcbf066c98017b78decd4ef9bcd6c]Mapping Documentation[/url]
+• [url=https://dreamware.notion.site/HYPERBEAT-Mod-Creator-Tester-Documentation-288bcbf066c980eca1d1da2a2772938f]Modding Documentation[/url]"
+
+[node name="ToolBar" type="HBoxContainer" parent="."]
+custom_minimum_size = Vector2(0, 36.72)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 31.0
+grow_horizontal = 2
+
+[node name="FileMenu" type="MenuButton" parent="ToolBar"]
+layout_mode = 2
+text = "FileMenu ▼"
+
+[node name="Panel" type="Panel" parent="ToolBar/FileMenu"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="gap4" type="Control" parent="ToolBar"]
+custom_minimum_size = Vector2(30.91, 0)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="ToolBar"]
+layout_mode = 2
+text = "BPM"
+
+[node name="BPMSpinBox" type="SpinBox" parent="ToolBar"]
+layout_mode = 2
+min_value = 20.0
+max_value = 240.0
+step = 0.1
+value = 120.0
+
+[node name="gap3" type="Control" parent="ToolBar"]
+custom_minimum_size = Vector2(19.065, 0)
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="ToolBar"]
+layout_mode = 2
+text = "Note Division"
+
+[node name="DivisionSelector" type="OptionButton" parent="ToolBar"]
+layout_mode = 2
+
+[node name="gap2" type="Control" parent="ToolBar"]
+custom_minimum_size = Vector2(13.705, 0)
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="ToolBar"]
+layout_mode = 2
+text = "Audio Controls"
+
+[node name="buttons" type="HBoxContainer" parent="ToolBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="play" type="Button" parent="ToolBar/buttons"]
+layout_mode = 2
+text = "PLAY"
+
+[node name="pause" type="Button" parent="ToolBar/buttons"]
+layout_mode = 2
+text = "STOP"
+
+[node name="label" type="Label" parent="ToolBar"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 21
+text = "Drag out for preview and tips ↓    "
+
+[node name="PopupMenu" type="PopupMenu" parent="."]
+oversampling_override = 1.0
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="CanvasLayer"]
+copy_mode = 2
+
+[node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_h4lnn")
+use_parent_material = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="intropanel" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_wbltj")
+
+[node name="ColorRect" type="ColorRect" parent="intropanel"]
+material = SubResource("ShaderMaterial_c0ied")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="intropanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="intropanel/PanelContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="intropanel/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Welcome to sooths simple midi editor!
+
+Loaded song files must be wav or ogg, and MUST start on beat
+If it doesnt, things will be out of time
+
+Direct any issues or suggestions to @soothsayer on discord
+"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="intropanel/PanelContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="CheckBox" type="CheckBox" parent="intropanel/PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "<- Don't Show Again"
+
+[node name="Label" type="Label" parent="intropanel/PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="intropanel/PanelContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Continue"
