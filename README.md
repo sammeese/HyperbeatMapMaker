@@ -5,10 +5,19 @@ I did use AI a fair bit to make this, I do not like AI, I think its cringe, but 
 Please note, that loaded songs will need to START on time with the down beat, otherwise the grid, regardless if the tempo is correct, will be out of time.
 
 
-There are current known critical issues and things need addressing:
+Install:
 
-An imported midi containing notes that have a NoteOn and NoteOFf in the same space (ie, a note directly following another with no gaps between) can occasionally merge into a single short note in the middle of the two.
+  Two choices - 
+    Download from releases
+    or 
+    Download the source, go to https://godotengine.org/download/archive/4.5-stable/ and get the Godot_v4.5-stable_win64.exe and put it in the project folder (next to project.godot), and run Godot_v4.5-stable_win64.exe 
 
-Some of the controls are a bit janky
 
-Currently no support for time signatures or triplet/sextuplet division
+
+Known Issues:
+
+  An imported midi containing notes that have a NoteOn and NoteOFf in the same space (ie, a note directly following another with no gaps between) can occasionally merge into a single short note in the middle of the two.
+  
+  Some of the controls are a bit janky
+  
+  Currently no support for time signatures or triplet/sextuplet division
