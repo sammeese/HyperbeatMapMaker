@@ -12,8 +12,8 @@ var scroll_offset: Vector2 = Vector2.ZERO
 var selected_note: EditorData.NoteData = null
 var context_menu: PopupMenu
 
-const LANE_HEIGHT = 20
-const LABEL_WIDTH = 100  # NEW: Width for lane labels
+const LABEL_WIDTH = 100  # Width for lane labels
+const RULER_HEIGHT = 30  # Height of ruler at top
 var NUM_LANES = EditorData.LANE_COUNT
 
 var dragging_note: EditorData.NoteData = null
@@ -32,9 +32,10 @@ var box_select_end: Vector2
 var copied_notes: Array[Dictionary] = []  # Store relative positions
 
 func _ready():
-	custom_minimum_size = Vector2(100000, LANE_HEIGHT * NUM_LANES)  # Much larger limit
+	update_canvas_size()
 	EditorData.notes_changed.connect(_on_notes_changed)
 	EditorData.playback_position_changed.connect(_on_playback_position_changed)
+	EditorData.lane_height_changed.connect(_on_lane_height_changed)
 	setup_context_menu()
 	
 	# Get reference to midi_editor (traverse up the node tree)
@@ -62,7 +63,12 @@ func _on_scroll_changed(_value: float):
 func _on_playback_position_changed(_time: float):
 	queue_redraw()  # Redraw to update playhead position
 
+func _on_lane_height_changed(_new_height: int):
+	update_canvas_size()
+	queue_redraw()
+
 func _draw():
+	draw_ruler()  # Draw ruler first (at top)
 	draw_grid()
 	draw_lane_separators()
 	draw_notes()
@@ -77,7 +83,7 @@ func draw_lane_labels():
 	var scroll_offset = scroll_container.scroll_horizontal if scroll_container else 0
 	
 	for i in range(NUM_LANES):
-		var y = i * LANE_HEIGHT + LANE_HEIGHT / 2
+		var y = RULER_HEIGHT + i * EditorData.lane_height + EditorData.lane_height / 2
 		var label = EditorData.LANE_LABELS[i]
 		
 		# Draw label at fixed position (accounting for scroll)
@@ -85,15 +91,73 @@ func draw_lane_labels():
 		draw_string(font, Vector2(label_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, LABEL_WIDTH - 10, 12)
 	
 	# Draw background rectangle behind labels so they're readable
-	var label_rect = Rect2(scroll_offset, 0, LABEL_WIDTH, size.y)
+	var label_rect = Rect2(scroll_offset, RULER_HEIGHT, LABEL_WIDTH, size.y - RULER_HEIGHT)
 	draw_rect(label_rect, Color(0.15, 0.15, 0.15, 0.95), true)
 	
 	# Redraw labels on top of background
 	for i in range(NUM_LANES):
-		var y = i * LANE_HEIGHT + LANE_HEIGHT / 2
+		var y = RULER_HEIGHT + i * EditorData.lane_height + EditorData.lane_height / 2
 		var label = EditorData.LANE_LABELS[i]
 		var label_x = scroll_offset + 5
 		draw_string(font, Vector2(label_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, LABEL_WIDTH - 10, 12)
+
+func draw_ruler():
+	var font = ThemeDB.fallback_font
+	var scroll_offset = scroll_container.scroll_horizontal if scroll_container else 0
+	
+	# Background for ruler
+	draw_rect(Rect2(0, 0, size.x, RULER_HEIGHT), Color(0.2, 0.2, 0.2))
+	
+	var visible_start_beat = pixel_to_beat(scroll_offset + LABEL_WIDTH)
+	var visible_end_beat = pixel_to_beat(scroll_offset + size.x)
+	
+	# Draw bar markers and labels
+	var beats_per_bar = 4  # 4/4 time signature
+	var start_bar = floor(visible_start_beat / beats_per_bar)
+	var end_bar = ceil(visible_end_beat / beats_per_bar) + 1
+	
+	for bar_num in range(start_bar, end_bar):
+		var beat = bar_num * beats_per_bar
+		var x = beat_to_pixel(beat)
+		
+		if x < LABEL_WIDTH:
+			continue
+		
+		# Draw major tick (bar line)
+		draw_line(Vector2(x, 0), Vector2(x, RULER_HEIGHT), Color.WHITE, 2.0)
+		
+		# Draw bar number
+		var bar_label = "Bar %d" % (bar_num + 1)
+		draw_string(font, Vector2(x + 5, 15), bar_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+		
+		# Draw timecode (time at this bar)
+		var time_at_bar = EditorData.beats_to_seconds(beat)
+		var timecode = format_timecode(time_at_bar)
+		draw_string(font, Vector2(x + 5, 28), timecode, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.8, 0.8, 0.8))
+		
+		# Draw minor ticks (beat lines within bar)
+		for beat_offset in range(1, beats_per_bar):
+			var minor_beat = beat + beat_offset
+			var minor_x = beat_to_pixel(minor_beat)
+			
+			if minor_x < LABEL_WIDTH:
+				continue
+			
+			draw_line(Vector2(minor_x, RULER_HEIGHT - 10), Vector2(minor_x, RULER_HEIGHT), 
+					  Color(0.6, 0.6, 0.6), 1.0)
+	
+	# Draw sticky label background over ruler
+	var label_rect = Rect2(scroll_offset, 0, LABEL_WIDTH, RULER_HEIGHT)
+	draw_rect(label_rect, Color(0.15, 0.15, 0.15, 0.95), true)
+	
+	# Draw "Timeline" label
+	draw_string(font, Vector2(scroll_offset + 5, 20), "Timeline", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+
+func format_timecode(seconds: float) -> String:
+	var mins = int(seconds) / 60
+	var secs = int(seconds) % 60
+	var millis = int((seconds - int(seconds)) * 100)
+	return "%d:%02d.%02d" % [mins, secs, millis]
 
 func draw_selection_box():
 	# Draw selected notes with highlight
@@ -103,10 +167,10 @@ func draw_selection_box():
 		
 		var x_start = beat_to_pixel(note.beat_position)
 		var x_end = beat_to_pixel(note.beat_position + note.duration)
-		var y = note.lane * LANE_HEIGHT
+		var y = RULER_HEIGHT + note.lane * EditorData.lane_height
 		
 		var note_width = x_end - x_start
-		var note_rect = Rect2(x_start, y + 5, note_width, LANE_HEIGHT - 10)
+		var note_rect = Rect2(x_start, y + 5, note_width, EditorData.lane_height - 10)
 		
 		# Draw selection outline
 		draw_rect(note_rect, Color.YELLOW, false, 2.0)
@@ -126,14 +190,14 @@ func draw_playhead():
 	
 	# Draw playhead if it's visible (don't check against LABEL_WIDTH, let it draw over labels)
 	if x >= 0 and x <= size.x:
-		# Draw vertical line
-		draw_line(Vector2(x, 0), Vector2(x, size.y), Color(1.0, 0.3, 0.3, 0.8), 3.0)
+		# Draw vertical line starting below ruler
+		draw_line(Vector2(x, RULER_HEIGHT), Vector2(x, size.y), Color(1.0, 0.3, 0.3, 0.8), 3.0)
 		
-		# Draw triangle at top
+		# Draw triangle at ruler (pointing down into lanes)
 		var triangle = PackedVector2Array([
-			Vector2(x - 8, 0),
-			Vector2(x + 8, 0),
-			Vector2(x, 12)
+			Vector2(x - 8, RULER_HEIGHT),
+			Vector2(x + 8, RULER_HEIGHT),
+			Vector2(x, RULER_HEIGHT + 12)
 		])
 		draw_colored_polygon(triangle, Color(1.0, 0.3, 0.3, 0.9))
 
@@ -203,17 +267,17 @@ func draw_grid():
 			color = Color(0.3, 0.3, 0.3, 0.4)
 			width = 1.0
 		
-		draw_line(Vector2(x, 0), Vector2(x, size.y), color, width)
+		draw_line(Vector2(x, RULER_HEIGHT), Vector2(x, size.y), color, width)
 		
 func draw_lane_separators():
 	for i in range(NUM_LANES + 1):
-		var y = i * LANE_HEIGHT
+		var y = RULER_HEIGHT + i * EditorData.lane_height
 		var scroll_offset = scroll_container.scroll_horizontal if scroll_container else 0
 		draw_line(Vector2(scroll_offset + LABEL_WIDTH, y), Vector2(size.x, y), Color(0.4, 0.4, 0.4), 1.0)
 	
-	# Vertical line after labels (sticky)
+	# Vertical line after labels (sticky) - starts below ruler
 	var scroll_offset = scroll_container.scroll_horizontal if scroll_container else 0
-	draw_line(Vector2(scroll_offset + LABEL_WIDTH, 0), Vector2(scroll_offset + LABEL_WIDTH, size.y), Color(0.6, 0.6, 0.6), 2.0)
+	draw_line(Vector2(scroll_offset + LABEL_WIDTH, RULER_HEIGHT), Vector2(scroll_offset + LABEL_WIDTH, size.y), Color(0.6, 0.6, 0.6), 2.0)
 
 func draw_notes():
 	for note in EditorData.notes:
@@ -222,11 +286,11 @@ func draw_notes():
 		
 		var x_start = beat_to_pixel(note.beat_position)
 		var x_end = beat_to_pixel(note.beat_position + note.duration)
-		var y = note.lane * LANE_HEIGHT
+		var y = RULER_HEIGHT + note.lane * EditorData.lane_height
 		
 		# Note rectangle with length
 		var note_width = x_end - x_start
-		var note_rect = Rect2(x_start, y + 5, note_width, LANE_HEIGHT - 10)
+		var note_rect = Rect2(x_start, y + 5, note_width, EditorData.lane_height - 10)
 		
 		# Color by velocity
 		var color = get_velocity_color(note.velocity)
@@ -234,10 +298,10 @@ func draw_notes():
 		
 		# Velocity indicator (fill height)
 		var fill_percent = note.velocity / 9.0
-		var fill_height = (LANE_HEIGHT - 10) * fill_percent
+		var fill_height = (EditorData.lane_height - 10) * fill_percent
 		var fill_rect = Rect2(
 			x_start,
-			y + LANE_HEIGHT - 5 - fill_height,
+			y + EditorData.lane_height - 5 - fill_height,
 			note_width,
 			fill_height
 		)
@@ -246,13 +310,17 @@ func draw_notes():
 		# Clock position indicator for edge notes
 		if note.clock_position >= 0:
 			var font = ThemeDB.fallback_font
-			var text = str(note.clock_position)
+			var text 
+			if note.clock_position == 0:
+				text = str(12)
+			else:
+				text = str(note.clock_position)
 			draw_string(font, Vector2(x_start + 5, y + 25), text, 
 					   HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 		
 		# Resize handle at the end of note
 		var handle_size = 8.0
-		var handle_rect = Rect2(x_end - handle_size, y + LANE_HEIGHT/2 - handle_size/2, 
+		var handle_rect = Rect2(x_end - handle_size, y + EditorData.lane_height/2 - handle_size/2, 
 							   handle_size, handle_size)
 		draw_rect(handle_rect, Color.WHITE)
 
@@ -395,7 +463,7 @@ func handle_left_click(pos: Vector2):
 	selected_notes.clear()
 	
 	var beat = pixel_to_beat(pos.x)
-	var lane = int(pos.y / LANE_HEIGHT)
+	var lane = int((pos.y - RULER_HEIGHT) / EditorData.lane_height)
 	
 	if lane >= NUM_LANES:
 		return
@@ -436,7 +504,7 @@ func handle_drag(pos: Vector2):
 	elif drag_mode == "move":
 		# Move note to new position
 		var new_beat = pixel_to_beat(pos.x)
-		var new_lane = int(pos.y / LANE_HEIGHT)
+		var new_lane = int((pos.y - RULER_HEIGHT) / EditorData.lane_height)
 		
 		# Snap to grid
 		new_beat = snap_to_grid(new_beat)
@@ -522,9 +590,9 @@ func update_box_selection(pos: Vector2):
 	for note in EditorData.notes:
 		var x_start = beat_to_pixel(note.beat_position)
 		var x_end = beat_to_pixel(note.beat_position + note.duration)
-		var y = note.lane * LANE_HEIGHT
+		var y = RULER_HEIGHT + note.lane * EditorData.lane_height
 		
-		var note_rect = Rect2(x_start, y + 5, x_end - x_start, LANE_HEIGHT - 10)
+		var note_rect = Rect2(x_start, y + 5, x_end - x_start, EditorData.lane_height - 10)
 		
 		if rect.intersects(note_rect):
 			if not note in newly_selected:
@@ -577,7 +645,7 @@ func paste_notes_at_mouse():
 	
 	var mouse_pos = get_local_mouse_position()
 	var paste_beat = snap_to_grid(pixel_to_beat(mouse_pos.x))
-	var paste_lane = int(mouse_pos.y / LANE_HEIGHT)
+	var paste_lane = int((mouse_pos.y - RULER_HEIGHT) / EditorData.lane_height)
 	
 	if paste_lane >= NUM_LANES:
 		return
@@ -625,7 +693,7 @@ func get_note_at_position(pos: Vector2) -> EditorData.NoteData:
 		return null
 	
 	var beat = pixel_to_beat(pos.x)
-	var lane = int(pos.y / LANE_HEIGHT)
+	var lane = int((pos.y - RULER_HEIGHT) / EditorData.lane_height)
 	
 	for note in EditorData.notes:
 		if note.lane != lane:
@@ -718,7 +786,7 @@ func _on_velocity_dialog_cancel():
 
 func handle_note_placement(pos: Vector2):
 	var beat = pixel_to_beat(pos.x)
-	var lane = int(pos.y / LANE_HEIGHT)
+	var lane = int((pos.y - RULER_HEIGHT) / EditorData.lane_height)
 	
 	if lane >= NUM_LANES:
 		return
@@ -735,6 +803,8 @@ func handle_note_placement(pos: Vector2):
 	EditorData.add_note(note)
 
 func snap_to_grid(beat: float) -> float:
+	if not EditorData.snap_enabled:
+		return beat
 	var division_size = 1.0 / float(EditorData.snap_division)
 	return round(beat / division_size) * division_size
 
@@ -800,6 +870,7 @@ func update_canvas_size():
 	
 	# Set minimum size (allow extra scrolling)
 	custom_minimum_size.x = max(required_width, 1000)
+	custom_minimum_size.y = RULER_HEIGHT + (EditorData.lane_height * NUM_LANES)
 
 func fix_zero_length_notes():
 	# Fix all notes with duration below minimum

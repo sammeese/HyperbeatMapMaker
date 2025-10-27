@@ -1,11 +1,11 @@
+Control
+HBoxContainer
 Button
 Label
 CheckBox
-HBoxContainer
 VBoxContainer
 PanelContainer
 ColorRect
-Control
 BackBufferCopy
 TextureRect
 CanvasLayer

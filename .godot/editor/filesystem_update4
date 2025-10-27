@@ -2,5 +2,6 @@ res://scenes/midi_editor.tscn
 res://resources/shader.gdshader
 res://resources/blur.gdshader
 res://scripts/midi_editor.gd
-res://addons/midi_import/midi_data.gd
-res://addons/midi_import/midi_import.gd
+res://scripts/editor_data.gd
+res://scripts/timeline_ruler.gd
+res://scripts/timeline_canvas.gd

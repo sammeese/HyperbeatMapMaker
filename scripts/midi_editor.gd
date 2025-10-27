@@ -4,6 +4,10 @@ extends Control
 @onready var file_menu: MenuButton = $ToolBar/FileMenu
 @onready var bpm_input: SpinBox = $ToolBar/BPMSpinBox
 @onready var division_selector: OptionButton = $ToolBar/DivisionSelector
+@onready var tool_bar_2: HBoxContainer = $Control/ToolBar2
+@onready var audio_offset_input: SpinBox = null  # Will be created in _ready
+@onready var snap_toggle: CheckButton = null  # Will be created in _ready
+@onready var lane_height_slider: HSlider = null  # Will be created in _ready
 @onready var timeline_canvas: Control = $HSplit/Control/TimelinePanel/ScrollContainer/TimelineCanvas
 @onready var scroll_container: ScrollContainer = $HSplit/Control/TimelinePanel/ScrollContainer
 
@@ -21,6 +25,9 @@ const NUM_LANES = 21
 func _ready():
 	setup_file_menu()
 	setup_division_selector()
+	setup_audio_offset_control()
+	setup_snap_toggle()
+	setup_lane_height_slider()
 	setup_time_display()
 	EditorData.bpm_changed.connect(_on_bpm_changed)
 	play_button.pressed.connect(_on_play_pressed)
@@ -30,6 +37,71 @@ func _ready():
 func _on_bpm_input_changed(value: float):
 	EditorData.bpm = value
 	EditorData.bpm_changed.emit(value)
+
+func setup_audio_offset_control():
+	# Create label
+	var label = Label.new()
+	label.text = "Audio Offset:"
+	label.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(label)
+	
+	# Create spinbox for audio offset
+	audio_offset_input = SpinBox.new()
+	audio_offset_input.min_value = -10.0
+	audio_offset_input.max_value = 10.0
+	audio_offset_input.step = 0.01
+	audio_offset_input.value = 0.0
+	audio_offset_input.custom_minimum_size = Vector2(100, 0)
+	audio_offset_input.tooltip_text = "Audio offset in seconds\nPositive = audio plays later"
+	audio_offset_input.value_changed.connect(_on_audio_offset_changed)
+	tool_bar_2.add_child(audio_offset_input)
+
+func _on_audio_offset_changed(value: float):
+	EditorData.audio_offset = value
+	# If playing, restart to apply offset immediately
+	if EditorData.is_playing:
+		var current_pos = EditorData.current_time
+		audio_player.stop()
+		playback_position = current_pos
+		audio_player.play(max(0.0, playback_position - EditorData.audio_offset))
+		time_begin = Time.get_ticks_usec()
+		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
+		time_begin -= int(playback_position * 1_000_000.0)
+
+func setup_snap_toggle():
+	# Create snap toggle checkbox
+	snap_toggle = CheckButton.new()
+	snap_toggle.text = "Snap to Grid"
+	snap_toggle.button_pressed = true
+	snap_toggle.tooltip_text = "Enable/disable grid snapping"
+	snap_toggle.toggled.connect(_on_snap_toggled)
+	tool_bar_2.add_child(snap_toggle)
+
+func _on_snap_toggled(enabled: bool):
+	EditorData.snap_enabled = enabled
+
+func setup_lane_height_slider():
+	# Create label
+	var label = Label.new()
+	label.text = "Lane Height:"
+	label.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(label)
+	
+	# Create slider for lane height
+	lane_height_slider = HSlider.new()
+	lane_height_slider.min_value = 15
+	lane_height_slider.max_value = 50
+	lane_height_slider.step = 1
+	lane_height_slider.value = 20
+	lane_height_slider.custom_minimum_size = Vector2(100, 0)
+	lane_height_slider.tooltip_text = "Adjust lane height"
+	lane_height_slider.value_changed.connect(_on_lane_height_changed)
+	tool_bar_2.add_child(lane_height_slider)
+
+func _on_lane_height_changed(value: float):
+	EditorData.lane_height = int(value)
+	EditorData.lane_height_changed.emit(int(value))
+	timeline_canvas.queue_redraw()
 
 func setup_time_display():
 	# Create a label in the toolbar to show playback time
@@ -157,12 +229,43 @@ func parse_midi_to_notes():
 	print("PPQ: %d" % EditorData.ppq)
 	print("BPM: %.2f" % EditorData.bpm)
 	
+	# First pass: look for audio offset text event
+	var imported_offset = 0.0
+	var offset_ticks = 0
+	var offset_found = false
+	for track in EditorData.midi_data.tracks:
+		if not track or not "events" in track:
+			continue
+		for event in track.events:
+			# Check for text meta event (MidiData.Text)
+			if event is MidiData.Text:
+				var text = event.text if "text" in event else ""
+				if text.begins_with("AUDIO_OFFSET="):
+					imported_offset = float(text.substr(13))  # Skip "AUDIO_OFFSET="
+					var offset_beats = EditorData.seconds_to_beats(abs(imported_offset))
+					offset_ticks = EditorData.beats_to_ticks(offset_beats)
+					print("Found audio offset in MIDI: %.3f seconds (%d ticks)" % [imported_offset, offset_ticks])
+					offset_found = true
+					break
+		if offset_found:
+			break
+	
+	# Set offset (or reset to 0 if not found)
+	if audio_offset_input:
+		audio_offset_input.value = imported_offset
+	EditorData.audio_offset = imported_offset
+	if not offset_found:
+		print("No audio offset found in MIDI, defaulting to 0.0")
+	
+	var debug_note_events = {}  # Track events for debugging {note_number: [events]}
+	
 	for track in EditorData.midi_data.tracks:
 		if not track or not "events" in track:
 			continue
 			
 		var current_tick = 0
 		var active_notes = {}  # {note_number: {tick: int, velocity: int}}
+		var completed_at_tick = {}  # Track which notes were completed at which tick
 		
 		for event in track.events:
 			if not event:
@@ -175,6 +278,17 @@ func parse_midi_to_notes():
 			# Handle NoteOn events
 			if event is MidiData.NoteOn:
 				if event.velocity > 0:
+					# Initialize debug tracking for this note if needed
+					if not event.note in debug_note_events:
+						debug_note_events[event.note] = []
+					debug_note_events[event.note].append("Tick %d: NoteOn vel=%d" % [current_tick, event.velocity])
+					
+					# If note is already active, complete it first before starting new one
+					if event.note in active_notes:
+						debug_note_events[event.note].append("  -> Completing previous active note")
+						create_note_from_active(active_notes, event.note, current_tick, offset_ticks)
+						# Mark that we completed this note at this tick
+						completed_at_tick[event.note] = current_tick
 					# Store note-on event
 					active_notes[event.note] = {
 						"tick": current_tick,
@@ -182,21 +296,48 @@ func parse_midi_to_notes():
 					}
 				else:
 					# NoteOn with velocity 0 = NoteOff
+					if not event.note in debug_note_events:
+						debug_note_events[event.note] = []
+					debug_note_events[event.note].append("Tick %d: NoteOn vel=0 (NoteOff)" % current_tick)
+					# Check if we already completed this note at this tick
+					if event.note in completed_at_tick and completed_at_tick[event.note] == current_tick:
+						debug_note_events[event.note].append("  -> Skipping redundant NoteOff (already completed)")
+						continue
 					if event.note in active_notes:
-						create_note_from_active(active_notes, event.note, current_tick)
+						create_note_from_active(active_notes, event.note, current_tick, offset_ticks)
 			
 			# Handle NoteOff events
 			elif event is MidiData.NoteOff:
+				if not event.note in debug_note_events:
+					debug_note_events[event.note] = []
+				debug_note_events[event.note].append("Tick %d: NoteOff" % current_tick)
+				# Check if we already completed this note at this tick
+				if event.note in completed_at_tick and completed_at_tick[event.note] == current_tick:
+					debug_note_events[event.note].append("  -> Skipping redundant NoteOff (already completed)")
+					continue
 				if event.note in active_notes:
-					create_note_from_active(active_notes, event.note, current_tick)
+					create_note_from_active(active_notes, event.note, current_tick, offset_ticks)
+	
+	# Print debug events for notes with bar note velocity (9)
+	print("\n--- Event Sequence (first 3 notes of each type) ---")
+	for note_num in debug_note_events.keys():
+		var events = debug_note_events[note_num]
+		if events.size() > 0:
+			print("MIDI Note %d:" % note_num)
+			for i in range(min(6, events.size())):  # First 6 events per note
+				print("  " + events[i])
+	print("---\n")
 	
 	print("Loaded %d notes from MIDI file" % EditorData.notes.size())
 	print("========================\n")
 
-func create_note_from_active(active_notes: Dictionary, note_number: int, current_tick: int):
+func create_note_from_active(active_notes: Dictionary, note_number: int, current_tick: int, offset_ticks: int = 0):
 	var note_on_data = active_notes[note_number]
 	var start_tick = note_on_data["tick"]
 	var duration_ticks = current_tick - start_tick
+	
+	# Shift note back by offset when importing
+	start_tick = max(0, start_tick - offset_ticks)
 	
 	var beat_pos = EditorData.ticks_to_beats(start_tick)
 	var duration_beats = EditorData.ticks_to_beats(duration_ticks)
@@ -230,6 +371,9 @@ func new_project():
 	EditorData.notes.clear()
 	EditorData.bpm = 120.0
 	bpm_input.value = 120.0
+	EditorData.audio_offset = 0.0
+	if audio_offset_input:
+		audio_offset_input.value = 0.0
 	EditorData.notes_changed.emit()
 
 func _on_bpm_changed(new_bpm: float):
@@ -239,6 +383,7 @@ func _on_bpm_changed(new_bpm: float):
 func load_audio_file():
 	var dialog = FileDialog.new()
 	add_child(dialog)
+	dialog.access = FileDialog.ACCESS_FILESYSTEM  # Allow access to any file
 	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	dialog.filters = ["*.ogg, *.mp3, *.wav ; Audio Files"]
 	dialog.file_selected.connect(_on_audio_file_selected)
@@ -268,34 +413,26 @@ func _on_play_pressed():
 		push_warning("Load an audio file first")
 		return
 	
-	if EditorData.is_playing:
-		# If already playing, stop and reset
-		stop_playback()
-	else:
-		# Start or resume playback
+	# Play button only starts/resumes playback, never stops
+	if not EditorData.is_playing:
 		EditorData.is_playing = true
 		time_begin = Time.get_ticks_usec()
 		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
 		
-		# Start from stored position (0.0 if stopped, or pause position)
-		audio_player.play(playback_position)
+		# Apply audio offset: timeline position - offset = audio position
+		# If offset is positive, audio plays later (start audio earlier in file)
+		var audio_start_position = max(0.0, playback_position - EditorData.audio_offset)
+		audio_player.play(audio_start_position)
 		
 		# Adjust time_begin to account for starting position
 		time_begin -= int(playback_position * 1_000_000.0)
-		
-		play_button.text = "Stop"
 
 func _on_pause_pressed():
+	# Pause button only pauses, never resumes
 	if EditorData.is_playing:
-		# Pause playback
 		EditorData.is_playing = false
 		playback_position = EditorData.current_time
 		audio_player.stop()
-		pause_button.text = "Resume"
-	else:
-		# Resume playback (same as play)
-		_on_play_pressed()
-		pause_button.text = "Pause"
 
 func stop_playback():
 	# Full stop - reset to beginning
@@ -304,8 +441,6 @@ func stop_playback():
 	playback_position = 0.0
 	EditorData.current_time = 0.0
 	EditorData.playback_position_changed.emit(0.0)
-	play_button.text = "Play"
-	pause_button.text = "Pause"
 	update_time_display()
 
 func seek_to_time(time_seconds: float):
@@ -320,8 +455,9 @@ func seek_to_time(time_seconds: float):
 	EditorData.playback_position_changed.emit(playback_position)
 	
 	if was_playing:
-		# Resume playback from new position
-		audio_player.play(playback_position)
+		# Resume playback from new position (with audio offset)
+		var audio_start_position = max(0.0, playback_position - EditorData.audio_offset)
+		audio_player.play(audio_start_position)
 		time_begin = Time.get_ticks_usec() - int(playback_position * 1_000_000.0)
 		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
 	
@@ -430,15 +566,31 @@ func create_combined_track_bytes() -> PackedByteArray:
 	track_data.append((us_per_beat >> 8) & 0xFF)
 	track_data.append(us_per_beat & 0xFF)
 	
+	# Add audio offset text event if offset is not zero
+	var offset_ticks = 0
+	if EditorData.audio_offset != 0.0:
+		var offset_beats = EditorData.seconds_to_beats(abs(EditorData.audio_offset))
+		offset_ticks = EditorData.beats_to_ticks(offset_beats)
+		
+		# Write text meta event: FF 01 <length> <text>
+		track_data.append_array(int_to_variable_length(0))  # Delta time = 0 (right after tempo)
+		track_data.append(0xFF)  # Meta event
+		track_data.append(0x01)  # Text event
+		var text = "AUDIO_OFFSET=%.3f" % EditorData.audio_offset
+		track_data.append(text.length())  # Length
+		track_data.append_array(text.to_ascii_buffer())
+		
+		print("Exporting with audio offset: %.3f seconds (%d ticks)" % [EditorData.audio_offset, offset_ticks])
+	
 	# Sort all notes by time
 	var all_notes = EditorData.notes.duplicate()
 	all_notes.sort_custom(func(a, b): return a.beat_position < b.beat_position)
 	
-	# Create note events
+	# Create note events and shift by offset
 	var events = []
 	for note in all_notes:
-		var start_tick = EditorData.beats_to_ticks(note.beat_position)
-		var end_tick = EditorData.beats_to_ticks(note.beat_position + note.duration)
+		var start_tick = EditorData.beats_to_ticks(note.beat_position) + offset_ticks
+		var end_tick = EditorData.beats_to_ticks(note.beat_position + note.duration) + offset_ticks
 		
 		# Note On event
 		events.append({

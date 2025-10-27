@@ -6,12 +6,15 @@ var bpm: float = 120.0
 var ppq: int = 480  # Pulses per quarter note
 
 var audio_file_path: String = ""
+var audio_offset: float = 0.0  # Audio offset in seconds (positive = audio plays later)
 
 # Editor state
 var notes: Array[NoteData] = []
 var current_time: float = 0.0
 var is_playing: bool = false
 var snap_division: int = 4  # 1/16th notes
+var snap_enabled: bool = true  # Grid snap toggle
+var lane_height: int = 20  # Height of each lane in pixels
 
 const LANE_COUNT = 21  # Actually 21 lanes based on your note list
 const MIN_NOTE_DURATION = 0.015625  # 1/64th of a beat (minimum note length)
@@ -43,11 +46,11 @@ const LANE_MIDI_NOTES = [
 
 # Lane labels (you can customize these)
 const LANE_LABELS = [
-	"0 Sections",      # Lane 0
-	"7 Tunnel",      # Lane 1
-	"8 Tunnel",      # Lane 2
-	"9 Ornaments",      # Lane 3
-	"10 Ornaments",     # Lane 4
+	"Sections",      # Lane 0
+	"Tunnel",      # Lane 1
+	"Tunnel",      # Lane 2
+	"Ornaments",      # Lane 3
+	"Ornaments",     # Lane 4
 	"V Mirror",     # Lane 5
 	"H Mirror",     # Lane 6
 	"Center",     # Lane 7
@@ -71,6 +74,7 @@ const LANE_LABELS = [
 signal notes_changed
 signal playback_position_changed(time: float)
 signal bpm_changed(new_bpm: float)
+signal lane_height_changed(new_height: int)
 
 class NoteData:
 	var beat_position: float

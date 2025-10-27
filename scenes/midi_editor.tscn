@@ -9,7 +9,7 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
 shader = ExtResource("4_gc6mo")
-shader_parameter/bloom_intensity = 1.9500000926249998
+shader_parameter/bloom_intensity = 1.950000092625
 shader_parameter/threshold = 0.6830000324425
 shader_parameter/bloom_spread = 8.734000367364999
 
@@ -36,7 +36,7 @@ grow_vertical = 2
 color = Color(0.043039158, 0.04303915, 0.04303915, 1)
 
 [node name="ColorRect2" type="ColorRect" parent="."]
-custom_minimum_size = Vector2(0, 36.17)
+custom_minimum_size = Vector2(0, 73.44)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -68,17 +68,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 78.0
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
-
-[node name="gap" type="Control" parent="HSplit/Control/TimelinePanel"]
-custom_minimum_size = Vector2(69.51, 34.46)
-layout_mode = 2
-
-[node name="TimelineRuler" type="Control" parent="HSplit/Control/TimelinePanel"]
-custom_minimum_size = Vector2(0, 27.235)
-layout_mode = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="HSplit/Control/TimelinePanel"]
 layout_mode = 2
@@ -221,6 +214,7 @@ min_value = 20.0
 max_value = 240.0
 step = 0.1
 value = 120.0
+select_all_on_focus = true
 
 [node name="gap3" type="Control" parent="ToolBar"]
 custom_minimum_size = Vector2(19.065, 0)
@@ -259,6 +253,24 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 21
 text = "Drag out for preview and tips ↓    "
 
+[node name="Control" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+
+[node name="ToolBar2" type="HBoxContainer" parent="Control"]
+custom_minimum_size = Vector2(0, 36.72)
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = 36.72
+offset_bottom = 73.44
+grow_horizontal = 2
+grow_vertical = 2
+
 [node name="PopupMenu" type="PopupMenu" parent="."]
 oversampling_override = 1.0
 
@@ -278,6 +290,7 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="intropanel" type="Control" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
