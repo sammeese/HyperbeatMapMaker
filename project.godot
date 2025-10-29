@@ -13,8 +13,8 @@ config_version=5
 config/name="hyperbeat map editor"
 run/main_scene="uid://dfg5gn03nngaw"
 config/features=PackedStringArray("4.5", "Forward Plus")
-boot_splash/show_image=false
 boot_splash/fullsize=false
+boot_splash/image="uid://cx6qrc8v3uwg2"
 config/icon="res://icon.svg"
 
 [autoload]

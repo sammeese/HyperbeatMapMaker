@@ -1,3 +1,5 @@
+ColorPickerButton
+Panel
 Control
 HBoxContainer
 Button
@@ -10,5 +12,4 @@ BackBufferCopy
 TextureRect
 CanvasLayer
 RichTextLabel
-Panel
 VSeparator

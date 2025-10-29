@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://dfg5gn03nngaw"]
+[gd_scene load_steps=12 format=3 uid="uid://dfg5gn03nngaw"]
 
 [ext_resource type="Script" uid="uid://bw22mciltt717" path="res://scripts/midi_editor.gd" id="1_fmcpj"]
 [ext_resource type="Script" uid="uid://cqtp1uih7s1e6" path="res://scripts/timeline_canvas.gd" id="2_hutrh"]
@@ -7,18 +7,57 @@
 [ext_resource type="Script" uid="uid://cmm027nffeyrg" path="res://scripts/rich_text_label.gd" id="4_hdkmi"]
 [ext_resource type="Script" uid="uid://cot1dggprffr4" path="res://scripts/intropanel.gd" id="5_wbltj"]
 [ext_resource type="Shader" uid="uid://da8dn48bjkg8m" path="res://resources/blur.gdshader" id="6_hdkmi"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
-shader = ExtResource("4_gc6mo")
-shader_parameter/bloom_intensity = 1.1590000550525
-shader_parameter/threshold = 0.77600003686
-shader_parameter/bloom_spread = 8.734000367364999
+[ext_resource type="Script" uid="uid://bu8syey15p0mj" path="res://scripts/fx_settings_panel.gd" id="7_c0ied"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_c0ied"]
 shader = ExtResource("6_hdkmi")
 shader_parameter/lod = 2.70000012825
 
-[node name="MidiEditor" type="Control"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c0ied"]
+bg_color = Color(0.25882354, 0.25882354, 0.25882354, 0.9019608)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_left = 5.0
+expand_margin_top = 5.0
+expand_margin_right = 5.0
+expand_margin_bottom = 5.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
+shader = ExtResource("4_gc6mo")
+shader_parameter/enable_bloom = false
+shader_parameter/bloom_intensity = 0.7
+shader_parameter/bloom_threshold = 0.8
+shader_parameter/bloom_spread = 15.0
+shader_parameter/enable_crt = false
+shader_parameter/crt_curvature = 6.0
+shader_parameter/scanline_intensity = 0.3
+shader_parameter/scanline_count = 400.0
+shader_parameter/vignette_intensity = 0.4
+shader_parameter/chromatic_aberration = 0.002
+shader_parameter/enable_vhs = false
+shader_parameter/vhs_distortion = 0.3
+shader_parameter/vhs_noise = 0.15
+shader_parameter/vhs_line_speed = 2.0
+shader_parameter/enable_color_grading = false
+shader_parameter/color_tint = Color(1, 0.6, 0.9, 1)
+shader_parameter/color_saturation = 1.5
+shader_parameter/color_contrast = 1.2
+shader_parameter/enable_posterize = false
+shader_parameter/color_steps = 16.0
+shader_parameter/enable_pixelate = false
+shader_parameter/pixel_size = 2.0
+shader_parameter/enable_grain = false
+shader_parameter/grain_intensity = 0.15
+shader_parameter/enable_glitch = false
+shader_parameter/glitch_intensity = 0.3
+shader_parameter/enable_hue_shift = false
+shader_parameter/hue_shift_speed = 0.5
+shader_parameter/time = 0.0
+
+[node name="MidiEditor" type="Control" node_paths=PackedStringArray("fx_settings_panel", "fx_color_rect")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,6 +65,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_fmcpj")
+fx_settings_panel = NodePath("fx_panel/fx_panel_setup")
+fx_color_rect = NodePath("CanvasLayer/ColorRect3")
 
 [node name="ColorRect" type="ColorRect" parent="."]
 layout_mode = 1
@@ -295,22 +336,6 @@ grow_vertical = 2
 [node name="PopupMenu" type="PopupMenu" parent="."]
 oversampling_override = 1.0
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
-
-[node name="BackBufferCopy" type="BackBufferCopy" parent="CanvasLayer"]
-copy_mode = 2
-
-[node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
-visible = false
-material = SubResource("ShaderMaterial_h4lnn")
-use_parent_material = true
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
 [node name="intropanel" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -372,5 +397,50 @@ layout_mode = 2
 [node name="Button" type="Button" parent="intropanel/PanelContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 text = "Continue"
+
+[node name="fx_panel" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="fx_panel_setup" type="Control" parent="fx_panel"]
+visible = false
+custom_minimum_size = Vector2(512, 512)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_c0ied")
+
+[node name="Panel" type="Panel" parent="fx_panel/fx_panel_setup"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_c0ied")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="CanvasLayer"]
+copy_mode = 2
+
+[node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_h4lnn")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [connection signal="meta_clicked" from="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" to="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" method="_on_meta_clicked"]

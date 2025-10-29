@@ -19,6 +19,10 @@ extends Control
 @onready var volume_slider: HSlider = null  # Will be created in _ready
 @onready var tap_tempo_button: Button = null  # Will be created in _ready
 @onready var waveform_amplitude_slider: HSlider = null  # Will be created in _ready
+@onready var fx_button: Button = null  # Will be created in _ready
+
+@export var fx_settings_panel: Control = null  # Set this to your fx_settings_panel Control node
+@export var fx_color_rect: ColorRect = null  # Set this to your ColorRect with the shader
 
 var time_begin: float
 var time_delay: float
@@ -42,6 +46,7 @@ func _ready():
 	setup_time_display()
 	setup_tap_tempo()
 	setup_waveform_amplitude_slider()
+	setup_fx_button()
 	EditorData.bpm_changed.connect(_on_bpm_changed)
 	play_button.pressed.connect(_on_play_pressed)
 	pause_button.pressed.connect(_on_pause_pressed)
@@ -205,6 +210,37 @@ func setup_waveform_amplitude_slider():
 func _on_waveform_amplitude_changed(value: float):
 	EditorData.waveform_amplitude = value
 	timeline_canvas.queue_redraw()  # Redraw to update waveform
+
+func setup_fx_button():
+	# Create FX settings button in toolbar2
+	fx_button = Button.new()
+	fx_button.text = "⏱"
+	fx_button.tooltip_text = "Post-Processing Effects"
+	fx_button.pressed.connect(_on_fx_button_pressed)
+	fx_button.custom_minimum_size = Vector2(40, 32)
+	tool_bar_2.add_child(fx_button)
+
+func _on_fx_button_pressed():
+	if not fx_settings_panel:
+		print("Error: fx_settings_panel not assigned. Please set it in the Inspector.")
+		return
+	
+	if not fx_color_rect:
+		print("Error: fx_color_rect not assigned. Please set it in the Inspector.")
+		return
+	
+	# Toggle visibility of the panel
+	fx_settings_panel.visible = !fx_settings_panel.visible
+	
+	# Load shader values when opening
+	if fx_settings_panel.visible:
+		if fx_color_rect.material and fx_color_rect.material is ShaderMaterial:
+			fx_settings_panel.set_shader_material(fx_color_rect.material)
+			fx_settings_panel.load_shader_values()
+		else:
+			print("Error: fx_color_rect doesn't have a ShaderMaterial")
+
+
 
 func _on_tap_tempo_pressed():
 	var current_time = Time.get_ticks_msec() / 1000.0
@@ -710,6 +746,10 @@ func get_audio_duration() -> float:
 
 @warning_ignore("unused_parameter")
 func _process(delta):
+	if fx_color_rect and fx_color_rect.material and fx_color_rect.material is ShaderMaterial:
+		var time = Time.get_ticks_msec() / 1000.0
+		fx_color_rect.material.set_shader_parameter("time", time)
+	
 	if EditorData.is_playing:
 		if audio_player.playing:
 			var time = (Time.get_ticks_usec() - time_begin) / 1000000.0
