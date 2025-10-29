@@ -211,7 +211,7 @@ func show_context_menu_for_note(note: EditorData.NoteData, position: Vector2):
 	context_menu.clear()
 	
 	# Check if this is an edge note (lanes 8-19)
-	if note.lane >= 8 and note.lane <= 19:
+	if note.lane >= 7 and note.lane <= 19:
 		# Edge note - specific velocity options with labels
 		context_menu.add_item("Target Note", 1)
 		context_menu.add_item("Swipe Left", 3)
@@ -479,7 +479,7 @@ func handle_left_click(pos: Vector2):
 	
 	# Default velocity based on lane type
 	var velocity = 64  # Default for non-edge notes
-	if lane >= 8 and lane <= 19:
+	if lane >= 7 and lane <= 20:
 		# Edge note - default to Target Note
 		velocity = 1
 	

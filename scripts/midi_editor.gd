@@ -607,8 +607,24 @@ func create_combined_track_bytes() -> PackedByteArray:
 			"note": note.midi_note
 		})
 	
-	# Sort events by tick
-	events.sort_custom(func(a, b): return a["tick"] < b["tick"])
+	# Sort events by tick, with NoteOff before NoteOn at same tick
+	# This ensures sustain notes properly end before new notes start
+	events.sort_custom(func(a, b): 
+		if a["tick"] != b["tick"]:
+			return a["tick"] < b["tick"]
+		# Same tick: NoteOff (type="note_off") comes before NoteOn (type="note_on")
+		# Alphabetically "note_off" > "note_on", so we reverse the comparison
+		return a["type"] > b["type"]
+	)
+	
+	# Debug: Print sustain lane (MIDI note 36, lane 20) events to verify ordering
+	print("\n=== Sustain Lane Events (MIDI Note 36) ===")
+	for event in events:
+		if event["note"] == 36:
+			var event_type = "ON " if event["type"] == "note_on" else "OFF"
+			var beat = EditorData.ticks_to_beats(event["tick"] - offset_ticks)
+			print("Tick %d (Beat %.3f): %s" % [event["tick"], beat, event_type])
+	print("==========================================\n")
 	
 	# Write note events with delta times (starting from tick 0 after tempo)
 	var last_tick = 0

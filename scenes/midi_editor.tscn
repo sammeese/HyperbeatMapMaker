@@ -1,16 +1,17 @@
-[gd_scene load_steps=9 format=3 uid="uid://dfg5gn03nngaw"]
+[gd_scene load_steps=10 format=3 uid="uid://dfg5gn03nngaw"]
 
 [ext_resource type="Script" uid="uid://bw22mciltt717" path="res://scripts/midi_editor.gd" id="1_fmcpj"]
 [ext_resource type="Script" uid="uid://cqtp1uih7s1e6" path="res://scripts/timeline_canvas.gd" id="2_hutrh"]
 [ext_resource type="Script" uid="uid://ceai2w8vydhp4" path="res://scripts/circular_preview.gd" id="3_3hibk"]
 [ext_resource type="Shader" uid="uid://sbjc05vr6pco" path="res://resources/shader.gdshader" id="4_gc6mo"]
+[ext_resource type="Script" uid="uid://cmm027nffeyrg" path="res://scripts/rich_text_label.gd" id="4_hdkmi"]
 [ext_resource type="Script" uid="uid://cot1dggprffr4" path="res://scripts/intropanel.gd" id="5_wbltj"]
 [ext_resource type="Shader" uid="uid://da8dn48bjkg8m" path="res://resources/blur.gdshader" id="6_hdkmi"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
 shader = ExtResource("4_gc6mo")
-shader_parameter/bloom_intensity = 1.950000092625
-shader_parameter/threshold = 0.6830000324425
+shader_parameter/bloom_intensity = 1.1590000550525
+shader_parameter/threshold = 0.77600003686
 shader_parameter/bloom_spread = 8.734000367364999
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_c0ied"]
@@ -174,9 +175,12 @@ text = "[center][b]Control Guide[/b][/center]
 • Middle-click timeline to scrub
 
 [b]Documentation & Resources[/b]
-• [url=https://dreamware.notion.site/HYPERBEAT-Mod-Creator-Tester-Documentation-288bcbf066c980eca1d1da2a2772938f]Tunnel/Orn Velocity Guide[/url]
+• [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3593093470]Tunnel/Orn Velocity Guide[/url]
+
 • [url=https://dreamware.notion.site/HYPERBEAT-Mapping-Documentation-277bcbf066c98017b78decd4ef9bcd6c]Mapping Documentation[/url]
+
 • [url=https://dreamware.notion.site/HYPERBEAT-Mod-Creator-Tester-Documentation-288bcbf066c980eca1d1da2a2772938f]Modding Documentation[/url]"
+script = ExtResource("4_hdkmi")
 
 [node name="ToolBar" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(0, 36.72)
@@ -290,7 +294,6 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="intropanel" type="Control" parent="."]
-visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -329,8 +332,9 @@ layout_mode = 2
 layout_mode = 2
 text = "Welcome to sooths simple midi editor!
 
-Loaded song files must be wav or ogg, and MUST start on beat
-If it doesnt, things will be out of time
+Loaded song files must be wav or ogg, and if the song doesn't
+start on beat, you can use the audio offset feature
+and it will be reflected in the midi on export                             
 
 Direct any issues or suggestions to @soothsayer on discord
 "
@@ -350,3 +354,5 @@ layout_mode = 2
 [node name="Button" type="Button" parent="intropanel/PanelContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 text = "Continue"
+
+[connection signal="meta_clicked" from="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" to="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" method="_on_meta_clicked"]
