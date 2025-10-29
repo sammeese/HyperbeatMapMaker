@@ -148,31 +148,48 @@ custom_minimum_size = Vector2(125.575, 0)
 layout_mode = 2
 
 [node name="RichTextLabel" type="RichTextLabel" parent="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer"]
-custom_minimum_size = Vector2(200, 0)
+custom_minimum_size = Vector2(325, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 bbcode_enabled = true
-text = "[center][b]Control Guide[/b][/center]
+text = "
+[center][b]Control Guide[/b][/center]
 
 [b]Mouse Controls[/b]
 • [b]Left Click[/b] - Select/place notes
+• [b]Ctrl + Click[/b] - Toggle note in selection
 • [b]Right Click[/b] - Note context menu
-• [b]Middle Click[/b] - Seek to position
+• [b]Middle Click[/b] - Seek playback to position
 • [b]Shift + Drag[/b] - Box select notes
 • [b]Ctrl + Scroll[/b] - Zoom in/out
 
-[b]Keyboard Shortcuts[/b]
+[b]Editing[/b]
 • [b]Ctrl+C[/b] - Copy selected notes
-• [b]Ctrl+V[/b] - Paste notes at mouse
+• [b]Ctrl+V[/b] - Paste at mouse position
+• [b]Ctrl+D[/b] - Duplicate to end of selection
 • [b]Ctrl+A[/b] - Select all notes
-• [b]Ctrl+Click[/b] - Toggle note selection
-• [b]Delete/Backspace[/b] - Delete selected
+• [b]Delete/Backspace[/b] - Delete selected notes
 • [b]Escape[/b] - Clear selection
+• [b]Ctrl+Z[/b] - Undo
+• [b]Ctrl+Y[/b] or [b]Ctrl+Shift+Z[/b] - Redo
 
-[b]Playback Controls[/b]
-• [b]Play[/b] - Start/stop playback
-• [b]Pause[/b] - Pause/resume
-• Middle-click timeline to scrub
+[b]Navigation & Movement[/b]
+• [b]Arrow Keys[/b] - Nudge by grid division/lane
+• [b]Shift + Arrows[/b] - Mirror edge notes on clock
+• [b], (Comma)[/b] - Jump to previous section
+• [b]. (Period)[/b] - Jump to next section
+
+[b]Tools[/b]
+• [b]Q[/b] - Coarser snap division
+• [b]E[/b] - Finer snap division
+• [b]Space[/b] - Play/Pause
+
+[b]Quick Velocity[/b] (Hover edge note)
+• [b]Z[/b] - Swipe Left
+• [b]X[/b] - Swipe Right
+• [b]C[/b] - Target
+• [b]V[/b] - Soft
+• [b]B[/b] - Bar
 
 [b]Documentation & Resources[/b]
 • [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3593093470]Tunnel/Orn Velocity Guide[/url]
@@ -284,6 +301,7 @@ oversampling_override = 1.0
 copy_mode = 2
 
 [node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
+visible = false
 material = SubResource("ShaderMaterial_h4lnn")
 use_parent_material = true
 anchors_preset = 15

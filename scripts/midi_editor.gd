@@ -15,10 +15,19 @@ extends Control
 @onready var play_button: Button = $ToolBar/buttons/play
 @onready var pause_button: Button = $ToolBar/buttons/pause
 @onready var time_label: Label = null  # Will be created in _ready
+@onready var speed_selector: OptionButton = null  # Will be created in _ready
+@onready var volume_slider: HSlider = null  # Will be created in _ready
+@onready var tap_tempo_button: Button = null  # Will be created in _ready
+@onready var waveform_amplitude_slider: HSlider = null  # Will be created in _ready
 
 var time_begin: float
 var time_delay: float
 var playback_position: float = 0.0  # Store position for pause/resume
+
+# Tap tempo tracking
+var tap_times: Array[float] = []
+var tap_audio_positions: Array[float] = []
+const MAX_TAP_INTERVAL: float = 2.0  # Reset if more than 2 seconds between taps
 
 const NUM_LANES = 21
 
@@ -28,7 +37,11 @@ func _ready():
 	setup_audio_offset_control()
 	setup_snap_toggle()
 	setup_lane_height_slider()
+	setup_playback_speed_control()
+	setup_volume_control()
 	setup_time_display()
+	setup_tap_tempo()
+	setup_waveform_amplitude_slider()
 	EditorData.bpm_changed.connect(_on_bpm_changed)
 	play_button.pressed.connect(_on_play_pressed)
 	pause_button.pressed.connect(_on_pause_pressed)
@@ -93,10 +106,193 @@ func setup_lane_height_slider():
 	lane_height_slider.max_value = 50
 	lane_height_slider.step = 1
 	lane_height_slider.value = 20
-	lane_height_slider.custom_minimum_size = Vector2(100, 0)
+	lane_height_slider.custom_minimum_size = Vector2(100, 32)  # Set height to match other elements
+	lane_height_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # Center vertically
 	lane_height_slider.tooltip_text = "Adjust lane height"
 	lane_height_slider.value_changed.connect(_on_lane_height_changed)
 	tool_bar_2.add_child(lane_height_slider)
+
+func setup_playback_speed_control():
+	# Create label
+	var label = Label.new()
+	label.text = "Speed:"
+	label.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(label)
+	
+	# Create option button for playback speed
+	speed_selector = OptionButton.new()
+	speed_selector.add_item("0.25x", 0)
+	speed_selector.add_item("0.5x", 1)
+	speed_selector.add_item("0.75x", 2)
+	speed_selector.add_item("1x", 3)
+	speed_selector.add_item("1.25x", 4)
+	speed_selector.add_item("1.5x", 5)
+	speed_selector.add_item("2x", 6)
+	speed_selector.select(3)  # Default to 1x
+	speed_selector.custom_minimum_size = Vector2(80, 0)
+	speed_selector.tooltip_text = "Playback speed"
+	speed_selector.item_selected.connect(_on_speed_changed)
+	tool_bar_2.add_child(speed_selector)
+
+func _on_speed_changed(index: int):
+	var speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+	var speed = speeds[index]
+	audio_player.pitch_scale = speed
+	print("Playback speed: %.2fx" % speed)
+
+func setup_volume_control():
+	# Create label
+	var label = Label.new()
+	label.text = "Volume:"
+	label.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(label)
+	
+	# Create slider for volume
+	volume_slider = HSlider.new()
+	volume_slider.min_value = 0
+	volume_slider.max_value = 100
+	volume_slider.step = 1
+	volume_slider.value = 80  # Default 80%
+	volume_slider.custom_minimum_size = Vector2(100, 32)
+	volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	volume_slider.tooltip_text = "Audio volume"
+	volume_slider.value_changed.connect(_on_volume_changed)
+	tool_bar_2.add_child(volume_slider)
+	
+	# Set initial volume
+	_on_volume_changed(80)
+
+func _on_volume_changed(value: float):
+	# Convert 0-100 to dB scale
+	# 0% = -80 dB (effectively silent)
+	# 100% = 0 dB (full volume)
+	if value <= 0:
+		audio_player.volume_db = -80
+	else:
+		# Logarithmic scale: -40 dB at 10%, 0 dB at 100%
+		audio_player.volume_db = linear_to_db(value / 100.0)
+
+func setup_tap_tempo():
+	# Create tap tempo button in main toolbar
+	tap_tempo_button = Button.new()
+	tap_tempo_button.text = "Tap Tempo"
+	tap_tempo_button.tooltip_text = "Tap along to the beat to detect BPM and auto-set offset\n(Tap at least 4 times)"
+	tap_tempo_button.pressed.connect(_on_tap_tempo_pressed)
+	$ToolBar.add_child(tap_tempo_button)
+	
+	# Move to position after division selector
+	$ToolBar.move_child(tap_tempo_button, 3)
+
+func setup_waveform_amplitude_slider():
+	# Create label
+	var label = Label.new()
+	label.text = "Waveform:"
+	label.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(label)
+	
+	# Create slider for waveform amplitude
+	waveform_amplitude_slider = HSlider.new()
+	waveform_amplitude_slider.min_value = 0.1
+	waveform_amplitude_slider.max_value = 5.0
+	waveform_amplitude_slider.step = 0.1
+	waveform_amplitude_slider.value = 1.0  # Default 1x
+	waveform_amplitude_slider.custom_minimum_size = Vector2(100, 32)
+	waveform_amplitude_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	waveform_amplitude_slider.tooltip_text = "Adjust waveform amplitude display"
+	waveform_amplitude_slider.value_changed.connect(_on_waveform_amplitude_changed)
+	tool_bar_2.add_child(waveform_amplitude_slider)
+
+func _on_waveform_amplitude_changed(value: float):
+	EditorData.waveform_amplitude = value
+	timeline_canvas.queue_redraw()  # Redraw to update waveform
+
+func _on_tap_tempo_pressed():
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# Get current audio position
+	var audio_time = EditorData.current_time
+	
+	# Reset if too much time has passed since last tap
+	if tap_times.size() > 0:
+		var last_tap = tap_times[tap_times.size() - 1]
+		if current_time - last_tap > MAX_TAP_INTERVAL:
+			tap_times.clear()
+			tap_audio_positions.clear()
+			print("Tap tempo reset - start tapping again")
+			return
+	
+	# Record this tap
+	tap_times.append(current_time)
+	tap_audio_positions.append(audio_time)
+	
+	print("Tap %d recorded" % tap_times.size())
+	
+	# Need at least 4 taps to calculate BPM accurately
+	if tap_times.size() < 4:
+		print("Keep tapping... (need %d more)" % (4 - tap_times.size()))
+		return
+	
+	# Calculate BPM from tap intervals
+	var intervals: Array[float] = []
+	for i in range(1, tap_times.size()):
+		var interval = tap_times[i] - tap_times[i - 1]
+		intervals.append(interval)
+	
+	# Average interval
+	var avg_interval = 0.0
+	for interval in intervals:
+		avg_interval += interval
+	avg_interval /= intervals.size()
+	
+	# Convert to BPM (60 seconds / interval)
+	var detected_bpm = 60.0 / avg_interval
+	
+	# Round to nearest 0.1
+	detected_bpm = round(detected_bpm * 10.0) / 10.0
+	
+	# Calculate audio offset
+	# The first tap indicates where beat 0 should be
+	# offset = (audio_time at first tap) - (time since first tap in beats)
+	var time_since_first_tap = tap_audio_positions[tap_audio_positions.size() - 1] - tap_audio_positions[0]
+	var beats_since_first_tap = time_since_first_tap * detected_bpm / 60.0
+	var fractional_beat = fmod(beats_since_first_tap, 1.0)
+	
+	# Calculate offset: how far into the first beat were we when we started tapping
+	var beat_duration = 60.0 / detected_bpm
+	var offset = tap_audio_positions[0] - (floor(beats_since_first_tap) * beat_duration)
+	
+	# IMPORTANT: Temporarily disable audio restart when changing offset
+	var was_playing = EditorData.is_playing
+	var saved_time = EditorData.current_time
+	
+	# Apply detected BPM first
+	EditorData.bpm = detected_bpm
+	bpm_input.value = detected_bpm
+	
+	# For offset, we want the first tap to align with a beat
+	# So offset should be the audio time at first tap modulo beat duration
+	var aligned_offset = fmod(tap_audio_positions[0], beat_duration)
+	
+	# Apply offset without triggering audio restart
+	EditorData.audio_offset = -aligned_offset
+	if audio_offset_input:
+		# Block signal to prevent audio restart
+		audio_offset_input.value_changed.disconnect(_on_audio_offset_changed)
+		audio_offset_input.value = -aligned_offset
+		audio_offset_input.value_changed.connect(_on_audio_offset_changed)
+	
+	print("✓ Tap tempo complete!")
+	print("  Detected BPM: %.1f" % detected_bpm)
+	print("  Audio offset: %.3f seconds" % -aligned_offset)
+	print("  Based on %d taps" % tap_times.size())
+	
+	# Clear taps for next use
+	tap_times.clear()
+	tap_audio_positions.clear()
+	
+	# Update timeline
+	EditorData.bpm_changed.emit(detected_bpm)
+	timeline_canvas.queue_redraw()
 
 func _on_lane_height_changed(value: float):
 	EditorData.lane_height = int(value)
@@ -104,12 +300,16 @@ func _on_lane_height_changed(value: float):
 	timeline_canvas.queue_redraw()
 
 func setup_time_display():
-	# Create a label in the toolbar to show playback time
+	# Create a spacer to push time label to the right
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tool_bar_2.add_child(spacer)
+	
+	# Create a label in toolbar2 to show playback time
 	time_label = Label.new()
 	time_label.text = "0:00 / 0:00"
 	time_label.add_theme_font_size_override("font_size", 14)
-	$ToolBar.add_child(time_label)
-	$ToolBar.move_child(time_label, $ToolBar.get_child_count() - 1)  # Move to end
+	tool_bar_2.add_child(time_label)
 	
 func setup_file_menu():
 	var popup = file_menu.get_popup()
@@ -213,6 +413,9 @@ func _on_midi_file_selected(path: String):
 	
 	# Update canvas size for loaded notes
 	timeline_canvas.update_canvas_size()
+	
+	# Reset undo history after loading
+	timeline_canvas.reset_history()
 
 func parse_midi_to_notes():
 	EditorData.notes.clear()
@@ -375,6 +578,9 @@ func new_project():
 	if audio_offset_input:
 		audio_offset_input.value = 0.0
 	EditorData.notes_changed.emit()
+	
+	# Reset undo history for new project
+	timeline_canvas.reset_history()
 
 func _on_bpm_changed(new_bpm: float):
 	bpm_input.value = new_bpm
@@ -405,6 +611,10 @@ func _on_audio_file_selected(path: String):
 		audio_player.stream = stream
 		EditorData.audio_file_path = path
 		print("Audio loaded successfully: ", path)
+		
+		# Trigger waveform generation
+		timeline_canvas.waveform_needs_update = true
+		timeline_canvas.queue_redraw()
 	else:
 		push_error("Failed to load audio file. Make sure it's a valid audio file.")
 
@@ -433,6 +643,36 @@ func _on_pause_pressed():
 		EditorData.is_playing = false
 		playback_position = EditorData.current_time
 		audio_player.stop()
+
+func toggle_playback():
+	# Toggle between play and pause
+	if not audio_player.stream:
+		push_warning("Load an audio file first")
+		return
+	
+	if EditorData.is_playing:
+		_on_pause_pressed()
+	else:
+		_on_play_pressed()
+
+func cycle_division(direction: int):
+	# Cycle through snap divisions
+	# direction: -1 for Q (decrease), +1 for E (increase)
+	var current_index = division_selector.selected
+	var new_index = current_index + direction
+	
+	# Wrap around
+	if new_index < 0:
+		new_index = division_selector.item_count - 1
+	elif new_index >= division_selector.item_count:
+		new_index = 0
+	
+	division_selector.select(new_index)
+	_on_division_changed(new_index)
+	
+	# Print feedback
+	var division_names = ["1/4", "1/8", "1/16", "1/32", "1/64"]
+	print("Snap division: %s" % division_names[new_index])
 
 func stop_playback():
 	# Full stop - reset to beginning

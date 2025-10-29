@@ -15,6 +15,7 @@ var is_playing: bool = false
 var snap_division: int = 4  # 1/16th notes
 var snap_enabled: bool = true  # Grid snap toggle
 var lane_height: int = 20  # Height of each lane in pixels
+var waveform_amplitude: float = 1.0  # Amplitude multiplier for waveform display
 
 const LANE_COUNT = 21  # Actually 21 lanes based on your note list
 const MIN_NOTE_DURATION = 0.015625  # 1/64th of a beat (minimum note length)
