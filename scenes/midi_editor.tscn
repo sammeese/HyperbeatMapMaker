@@ -9,22 +9,6 @@
 [ext_resource type="Shader" uid="uid://da8dn48bjkg8m" path="res://resources/blur.gdshader" id="6_hdkmi"]
 [ext_resource type="Script" uid="uid://bu8syey15p0mj" path="res://scripts/fx_settings_panel.gd" id="7_c0ied"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_c0ied"]
-shader = ExtResource("6_hdkmi")
-shader_parameter/lod = 2.70000012825
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c0ied"]
-bg_color = Color(0.25882354, 0.25882354, 0.25882354, 0.9019608)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
-corner_detail = 5
-expand_margin_left = 5.0
-expand_margin_top = 5.0
-expand_margin_right = 5.0
-expand_margin_bottom = 5.0
-
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_h4lnn"]
 shader = ExtResource("4_gc6mo")
 shader_parameter/enable_bloom = false
@@ -56,6 +40,22 @@ shader_parameter/glitch_intensity = 0.3
 shader_parameter/enable_hue_shift = false
 shader_parameter/hue_shift_speed = 0.5
 shader_parameter/time = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_c0ied"]
+shader = ExtResource("6_hdkmi")
+shader_parameter/lod = 2.70000012825
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c0ied"]
+bg_color = Color(0.25882354, 0.25882354, 0.25882354, 0.9019608)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_left = 5.0
+expand_margin_top = 5.0
+expand_margin_right = 5.0
+expand_margin_bottom = 5.0
 
 [node name="MidiEditor" type="Control" node_paths=PackedStringArray("fx_settings_panel", "fx_color_rect")]
 layout_mode = 3
@@ -228,9 +228,10 @@ text = "
 [b]Quick Velocity[/b] (Hover edge note)
 • [b]Z[/b] - Swipe Left
 • [b]X[/b] - Swipe Right
-• [b]C[/b] - Target
-• [b]V[/b] - Soft
-• [b]B[/b] - Bar
+• [b]C[/b] - Cross
+• [b]V[/b] - Target
+• [b]B[/b] - Soft
+• [b]N[/b] - Bar
 
 [b]Documentation & Resources[/b]
 • [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3593093470]Tunnel/Orn Velocity Guide[/url]
@@ -336,6 +337,20 @@ grow_vertical = 2
 [node name="PopupMenu" type="PopupMenu" parent="."]
 oversampling_override = 1.0
 
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="CanvasLayer"]
+copy_mode = 2
+
+[node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_h4lnn")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="intropanel" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -408,7 +423,6 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="fx_panel_setup" type="Control" parent="fx_panel"]
-visible = false
 custom_minimum_size = Vector2(512, 512)
 layout_mode = 1
 anchors_preset = 8
@@ -429,18 +443,5 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_c0ied")
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
-
-[node name="BackBufferCopy" type="BackBufferCopy" parent="CanvasLayer"]
-copy_mode = 2
-
-[node name="ColorRect3" type="ColorRect" parent="CanvasLayer"]
-material = SubResource("ShaderMaterial_h4lnn")
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
 [connection signal="meta_clicked" from="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" to="HSplit/Panel/SubViewportContainer/SubViewport/HBoxContainer/RichTextLabel" method="_on_meta_clicked"]
+[connection signal="pressed" from="intropanel/PanelContainer/VBoxContainer/HBoxContainer/Button" to="intropanel" method="_on_button_pressed"]

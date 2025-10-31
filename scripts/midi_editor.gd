@@ -143,6 +143,7 @@ func _on_speed_changed(index: int):
 	var speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 	var speed = speeds[index]
 	audio_player.pitch_scale = speed
+	EditorData.playback_speed = speed  # Store speed in EditorData
 	print("Playback speed: %.2fx" % speed)
 
 func setup_volume_control():
@@ -360,16 +361,23 @@ func setup_file_menu():
 	popup.id_pressed.connect(_on_file_menu_selected)
 
 func setup_division_selector():
-	division_selector.add_item("1/4", 1)
-	division_selector.add_item("1/8", 2)
-	division_selector.add_item("1/16", 4)
-	division_selector.add_item("1/32", 8)
-	division_selector.add_item("1/64", 16)
-	division_selector.select(2)  # Default to 1/16
+	division_selector.add_item("1/4", 0)
+	division_selector.add_item("1/8", 1)
+	division_selector.add_item("1/8T", 2)  # Eighth note triplets
+	division_selector.add_item("1/16", 3)
+	division_selector.add_item("1/16T", 4)  # Sixteenth note triplets (sextuplets)
+	division_selector.add_item("1/32", 5)
+	division_selector.add_item("1/32T", 6)  # 32nd note triplets
+	division_selector.add_item("1/64", 7)
+	division_selector.add_item("1/64T", 8)  # 64th note triplets
+	division_selector.select(3)  # Default to 1/16
 	division_selector.item_selected.connect(_on_division_changed)
 
 func _on_division_changed(index: int):
-	var divisions = [1, 2, 4, 8, 16]  # Maps to 1/4, 1/8, 1/16, 1/32, 1/64
+	# Maps indices to divisions (notes per beat)
+	# Regular: 1/4=1, 1/8=2, 1/16=4, 1/32=8, 1/64=16
+	# Triplets: 1/8T=3, 1/16T=6, 1/32T=12, 1/64T=24
+	var divisions = [1, 2, 3, 4, 6, 8, 12, 16, 24]
 	EditorData.snap_division = divisions[index]
 	timeline_canvas.queue_redraw()
 
@@ -707,7 +715,7 @@ func cycle_division(direction: int):
 	_on_division_changed(new_index)
 	
 	# Print feedback
-	var division_names = ["1/4", "1/8", "1/16", "1/32", "1/64"]
+	var division_names = ["1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/32T", "1/64", "1/64T"]
 	print("Snap division: %s" % division_names[new_index])
 
 func stop_playback():
@@ -755,6 +763,9 @@ func _process(delta):
 			var time = (Time.get_ticks_usec() - time_begin) / 1000000.0
 			time -= time_delay
 			time = max(0, time)
+			
+			# Factor in playback speed - slower speed means timeline moves slower
+			time = time * EditorData.playback_speed
 			
 			EditorData.current_time = time
 			EditorData.playback_position_changed.emit(time)

@@ -838,7 +838,7 @@ func handle_keyboard_input(event: InputEventKey):
 	elif event.keycode == KEY_PERIOD:
 		jump_to_next_section()
 	
-	# Quick velocity setting for hovered note with Z, X, C, V, B
+	# Quick velocity setting for hovered note with Z, X, C, V, B, N
 	elif hovered_note and hovered_note.lane >= 8 and hovered_note.lane <= 19:
 		if event.keycode == KEY_Z:
 			hovered_note.velocity = 3  # Swipe Left
@@ -847,12 +847,15 @@ func handle_keyboard_input(event: InputEventKey):
 			hovered_note.velocity = 5  # Swipe Right
 			EditorData.notes_changed.emit()
 		elif event.keycode == KEY_C:
-			hovered_note.velocity = 1  # Target
+			hovered_note.velocity = 6  # Cross
 			EditorData.notes_changed.emit()
 		elif event.keycode == KEY_V:
-			hovered_note.velocity = 7  # Soft
+			hovered_note.velocity = 1  # Target
 			EditorData.notes_changed.emit()
 		elif event.keycode == KEY_B:
+			hovered_note.velocity = 7  # Soft
+			EditorData.notes_changed.emit()
+		elif event.keycode == KEY_N:
 			hovered_note.velocity = 9  # Bar
 			EditorData.notes_changed.emit()
 

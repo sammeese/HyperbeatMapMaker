@@ -7,6 +7,7 @@ var ppq: int = 480  # Pulses per quarter note
 
 var audio_file_path: String = ""
 var audio_offset: float = 0.0  # Audio offset in seconds (positive = audio plays later)
+var playback_speed: float = 1.0  # Current playback speed multiplier
 
 # Editor state
 var notes: Array[NoteData] = []

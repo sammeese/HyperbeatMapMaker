@@ -1,5 +1,3 @@
 res://scenes/midi_editor.tscn
 res://resources/shader.gdshader
 res://resources/blur.gdshader
-res://scripts/midi_editor.gd
-res://scripts/fx_settings_panel.gd
