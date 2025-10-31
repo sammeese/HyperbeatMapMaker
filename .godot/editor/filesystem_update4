@@ -1,3 +1,4 @@
 res://scenes/midi_editor.tscn
 res://resources/shader.gdshader
 res://resources/blur.gdshader
+res://scripts/midi_editor.gd

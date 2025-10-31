@@ -904,8 +904,8 @@ func create_combined_track_bytes() -> PackedByteArray:
 		if a["tick"] != b["tick"]:
 			return a["tick"] < b["tick"]
 		# Same tick: NoteOff (type="note_off") comes before NoteOn (type="note_on")
-		# Alphabetically "note_off" > "note_on", so we reverse the comparison
-		return a["type"] > b["type"]
+		# Alphabetically "note_off" < "note_on" (since 'f' < 'n')
+		return a["type"] < b["type"]
 	)
 	
 	# Debug: Print sustain lane (MIDI note 36, lane 20) events to verify ordering
