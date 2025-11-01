@@ -1,4 +1,6 @@
 res://scenes/midi_editor.tscn
 res://resources/shader.gdshader
 res://resources/blur.gdshader
+res://scripts/editor_data.gd
 res://scripts/midi_editor.gd
+res://scripts/timeline_canvas.gd

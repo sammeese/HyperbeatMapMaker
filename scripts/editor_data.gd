@@ -4,6 +4,8 @@ extends Node
 var midi_data: Resource  # From G0retZ library
 var bpm: float = 120.0
 var ppq: int = 480  # Pulses per quarter note
+var time_signature_numerator: int = 4  # Beats per measure
+var time_signature_denominator: int = 4  # Beat unit (4 = quarter note)
 
 var audio_file_path: String = ""
 var audio_offset: float = 0.0  # Audio offset in seconds (positive = audio plays later)
@@ -17,6 +19,8 @@ var snap_division: int = 4  # 1/16th notes
 var snap_enabled: bool = true  # Grid snap toggle
 var lane_height: int = 20  # Height of each lane in pixels
 var waveform_amplitude: float = 1.0  # Amplitude multiplier for waveform display
+var metronome_enabled: bool = false  # Metronome click during playback
+var note_hits_enabled: bool = false  # Play sound when notes trigger during playback
 
 const LANE_COUNT = 21  # Actually 21 lanes based on your note list
 const MIN_NOTE_DURATION = 0.015625  # 1/64th of a beat (minimum note length)
@@ -77,6 +81,7 @@ signal notes_changed
 signal playback_position_changed(time: float)
 signal bpm_changed(new_bpm: float)
 signal lane_height_changed(new_height: int)
+signal time_signature_changed(numerator: int, denominator: int)
 
 class NoteData:
 	var beat_position: float
@@ -125,3 +130,15 @@ func seconds_to_beats(seconds: float) -> float:
 
 func beats_to_seconds(beats: float) -> float:
 	return (beats * 60.0) / bpm
+
+func get_beats_per_measure() -> float:
+	# Convert denominator to quarter note equivalents
+	# e.g., 4 = quarter note = 1 beat, 8 = eighth note = 0.5 beat
+	var beat_value = 4.0 / float(time_signature_denominator)
+	return float(time_signature_numerator) * beat_value
+
+func beat_to_measure_and_beat(beat: float) -> Dictionary:
+	var beats_per_measure = get_beats_per_measure()
+	var measure = int(beat / beats_per_measure)
+	var beat_in_measure = fmod(beat, beats_per_measure)
+	return {"measure": measure, "beat": beat_in_measure}

@@ -20,6 +20,12 @@ extends Control
 @onready var tap_tempo_button: Button = null  # Will be created in _ready
 @onready var waveform_amplitude_slider: HSlider = null  # Will be created in _ready
 @onready var fx_button: Button = null  # Will be created in _ready
+@onready var metronome_toggle: CheckButton = null  # Will be created in _ready
+@onready var note_hits_toggle: CheckButton = null  # Will be created in _ready
+@onready var metronome_volume_slider: HSlider = null  # Will be created in _ready
+@onready var note_hits_volume_slider: HSlider = null  # Will be created in _ready
+@onready var time_sig_numerator: SpinBox = null  # Will be created in _ready
+@onready var time_sig_denominator: SpinBox = null  # Will be created in _ready
 
 @export var fx_settings_panel: Control = null  # Set this to your fx_settings_panel Control node
 @export var fx_color_rect: ColorRect = null  # Set this to your ColorRect with the shader
@@ -27,6 +33,14 @@ extends Control
 var time_begin: float
 var time_delay: float
 var playback_position: float = 0.0  # Store position for pause/resume
+
+# Metronome tracking
+var last_metronome_beat: int = -1
+var metronome_player: AudioStreamPlayer = null
+
+# Note hit tracking  
+var triggered_notes: Array = []  # Track which notes have been triggered
+var note_hit_player: AudioStreamPlayer = null
 
 # Tap tempo tracking
 var tap_times: Array[float] = []
@@ -38,15 +52,19 @@ const NUM_LANES = 21
 func _ready():
 	setup_file_menu()
 	setup_division_selector()
+	setup_tap_tempo()
+	setup_time_display()
+	setup_playback_speed_control()
+	setup_volume_control()
+	setup_waveform_amplitude_slider()
 	setup_audio_offset_control()
 	setup_snap_toggle()
 	setup_lane_height_slider()
-	setup_playback_speed_control()
-	setup_volume_control()
-	setup_time_display()
-	setup_tap_tempo()
-	setup_waveform_amplitude_slider()
+	setup_metronome_toggle()
+	setup_note_hits_toggle()
+	setup_time_signature_controls()
 	setup_fx_button()
+	setup_audio_players()
 	EditorData.bpm_changed.connect(_on_bpm_changed)
 	play_button.pressed.connect(_on_play_pressed)
 	pause_button.pressed.connect(_on_pause_pressed)
@@ -57,10 +75,11 @@ func _on_bpm_input_changed(value: float):
 	EditorData.bpm_changed.emit(value)
 
 func setup_audio_offset_control():
-	# Create label
+	# Create label with symbol
 	var label = Label.new()
-	label.text = "Audio Offset:"
-	label.add_theme_font_size_override("font_size", 14)
+	label.text = "⏱"  # Stopwatch symbol
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Audio offset"
 	tool_bar_2.add_child(label)
 	
 	# Create spinbox for audio offset
@@ -69,7 +88,7 @@ func setup_audio_offset_control():
 	audio_offset_input.max_value = 10.0
 	audio_offset_input.step = 0.01
 	audio_offset_input.value = 0.0
-	audio_offset_input.custom_minimum_size = Vector2(100, 0)
+	audio_offset_input.custom_minimum_size = Vector2(90, 0)
 	audio_offset_input.tooltip_text = "Audio offset in seconds\nPositive = audio plays later"
 	audio_offset_input.value_changed.connect(_on_audio_offset_changed)
 	tool_bar_2.add_child(audio_offset_input)
@@ -89,7 +108,7 @@ func _on_audio_offset_changed(value: float):
 func setup_snap_toggle():
 	# Create snap toggle checkbox
 	snap_toggle = CheckButton.new()
-	snap_toggle.text = "Snap to Grid"
+	snap_toggle.text = "🔒"  # Lock symbol
 	snap_toggle.button_pressed = true
 	snap_toggle.tooltip_text = "Enable/disable grid snapping"
 	snap_toggle.toggled.connect(_on_snap_toggled)
@@ -99,10 +118,11 @@ func _on_snap_toggled(enabled: bool):
 	EditorData.snap_enabled = enabled
 
 func setup_lane_height_slider():
-	# Create label
+	# Create label with symbol
 	var label = Label.new()
-	label.text = "Lane Height:"
-	label.add_theme_font_size_override("font_size", 14)
+	label.text = "↕"  # Up-down arrow
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Lane height"
 	tool_bar_2.add_child(label)
 	
 	# Create slider for lane height
@@ -111,18 +131,19 @@ func setup_lane_height_slider():
 	lane_height_slider.max_value = 50
 	lane_height_slider.step = 1
 	lane_height_slider.value = 20
-	lane_height_slider.custom_minimum_size = Vector2(100, 32)  # Set height to match other elements
-	lane_height_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # Center vertically
+	lane_height_slider.custom_minimum_size = Vector2(80, 32)
+	lane_height_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lane_height_slider.tooltip_text = "Adjust lane height"
 	lane_height_slider.value_changed.connect(_on_lane_height_changed)
 	tool_bar_2.add_child(lane_height_slider)
 
 func setup_playback_speed_control():
-	# Create label
+	# Create label with symbol
 	var label = Label.new()
-	label.text = "Speed:"
-	label.add_theme_font_size_override("font_size", 14)
-	tool_bar_2.add_child(label)
+	label.text = "⏳"  # Hourglass symbol
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Playback speed"
+	$ToolBar.add_child(label)
 	
 	# Create option button for playback speed
 	speed_selector = OptionButton.new()
@@ -134,24 +155,47 @@ func setup_playback_speed_control():
 	speed_selector.add_item("1.5x", 5)
 	speed_selector.add_item("2x", 6)
 	speed_selector.select(3)  # Default to 1x
-	speed_selector.custom_minimum_size = Vector2(80, 0)
+	speed_selector.custom_minimum_size = Vector2(70, 0)
 	speed_selector.tooltip_text = "Playback speed"
 	speed_selector.item_selected.connect(_on_speed_changed)
-	tool_bar_2.add_child(speed_selector)
+	$ToolBar.add_child(speed_selector)
 
 func _on_speed_changed(index: int):
 	var speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 	var speed = speeds[index]
+	var old_speed = EditorData.playback_speed
+	
 	audio_player.pitch_scale = speed
 	EditorData.playback_speed = speed  # Store speed in EditorData
+	
+	# If currently playing, restart to apply new speed without jumping
+	if EditorData.is_playing:
+		var current_pos = EditorData.current_time
+		audio_player.stop()
+		
+		# Ensure audio generator players are still running
+		if metronome_player and not metronome_player.playing:
+			metronome_player.play()
+		if note_hit_player and not note_hit_player.playing:
+			note_hit_player.play()
+		
+		# Start audio at correct position
+		var audio_start_position = max(0.0, current_pos - EditorData.audio_offset)
+		audio_player.play(audio_start_position)
+		
+		# Reset time_begin accounting for new speed
+		time_begin = Time.get_ticks_usec() - int((current_pos / speed) * 1_000_000.0)
+		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
+	
 	print("Playback speed: %.2fx" % speed)
 
 func setup_volume_control():
-	# Create label
+	# Create label with symbol
 	var label = Label.new()
-	label.text = "Volume:"
-	label.add_theme_font_size_override("font_size", 14)
-	tool_bar_2.add_child(label)
+	label.text = "🔊"  # Speaker symbol
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Audio volume"
+	$ToolBar.add_child(label)
 	
 	# Create slider for volume
 	volume_slider = HSlider.new()
@@ -159,11 +203,11 @@ func setup_volume_control():
 	volume_slider.max_value = 100
 	volume_slider.step = 1
 	volume_slider.value = 80  # Default 80%
-	volume_slider.custom_minimum_size = Vector2(100, 32)
+	volume_slider.custom_minimum_size = Vector2(80, 32)
 	volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	volume_slider.tooltip_text = "Audio volume"
 	volume_slider.value_changed.connect(_on_volume_changed)
-	tool_bar_2.add_child(volume_slider)
+	$ToolBar.add_child(volume_slider)
 	
 	# Set initial volume
 	_on_volume_changed(80)
@@ -190,11 +234,12 @@ func setup_tap_tempo():
 	$ToolBar.move_child(tap_tempo_button, 3)
 
 func setup_waveform_amplitude_slider():
-	# Create label
+	# Create label with symbol
 	var label = Label.new()
-	label.text = "Waveform:"
-	label.add_theme_font_size_override("font_size", 14)
-	tool_bar_2.add_child(label)
+	label.text = "〰"  # Wave symbol
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Waveform amplitude"
+	$ToolBar.add_child(label)
 	
 	# Create slider for waveform amplitude
 	waveform_amplitude_slider = HSlider.new()
@@ -202,20 +247,20 @@ func setup_waveform_amplitude_slider():
 	waveform_amplitude_slider.max_value = 5.0
 	waveform_amplitude_slider.step = 0.1
 	waveform_amplitude_slider.value = 1.0  # Default 1x
-	waveform_amplitude_slider.custom_minimum_size = Vector2(100, 32)
+	waveform_amplitude_slider.custom_minimum_size = Vector2(80, 32)
 	waveform_amplitude_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	waveform_amplitude_slider.tooltip_text = "Adjust waveform amplitude display"
 	waveform_amplitude_slider.value_changed.connect(_on_waveform_amplitude_changed)
-	tool_bar_2.add_child(waveform_amplitude_slider)
+	$ToolBar.add_child(waveform_amplitude_slider)
 
 func _on_waveform_amplitude_changed(value: float):
 	EditorData.waveform_amplitude = value
 	timeline_canvas.queue_redraw()  # Redraw to update waveform
 
 func setup_fx_button():
-	# Create FX settings button in toolbar2
+	# Create FX settings button in toolbar2 - will be last element
 	fx_button = Button.new()
-	fx_button.text = "⏱"
+	fx_button.text = "◊"  # Diamond symbol
 	fx_button.tooltip_text = "Post-Processing Effects"
 	fx_button.pressed.connect(_on_fx_button_pressed)
 	fx_button.custom_minimum_size = Vector2(40, 32)
@@ -337,16 +382,14 @@ func _on_lane_height_changed(value: float):
 	timeline_canvas.queue_redraw()
 
 func setup_time_display():
-	# Create a spacer to push time label to the right
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tool_bar_2.add_child(spacer)
-	
-	# Create a label in toolbar2 to show playback time
+	# Create time label in main toolbar
 	time_label = Label.new()
-	time_label.text = "0:00 / 0:00"
-	time_label.add_theme_font_size_override("font_size", 14)
-	tool_bar_2.add_child(time_label)
+	time_label.text = "0:00/0:00"
+	time_label.add_theme_font_size_override("font_size", 13)
+	time_label.custom_minimum_size = Vector2(90, 0)
+	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time_label.tooltip_text = "Current time / Total duration"
+	$ToolBar.add_child(time_label)
 	
 func setup_file_menu():
 	var popup = file_menu.get_popup()
@@ -673,13 +716,24 @@ func _on_play_pressed():
 		time_begin = Time.get_ticks_usec()
 		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
 		
+		# Reset metronome and note hit tracking
+		last_metronome_beat = -1
+		triggered_notes.clear()
+		
+		# Start the audio generator players
+		if metronome_player and not metronome_player.playing:
+			metronome_player.play()
+		if note_hit_player and not note_hit_player.playing:
+			note_hit_player.play()
+		
 		# Apply audio offset: timeline position - offset = audio position
 		# If offset is positive, audio plays later (start audio earlier in file)
 		var audio_start_position = max(0.0, playback_position - EditorData.audio_offset)
 		audio_player.play(audio_start_position)
 		
-		# Adjust time_begin to account for starting position
-		time_begin -= int(playback_position * 1_000_000.0)
+		# Adjust time_begin to account for starting position AND playback speed
+		# Since we multiply by speed in _process, we need to divide here
+		time_begin -= int((playback_position / EditorData.playback_speed) * 1_000_000.0)
 
 func _on_pause_pressed():
 	# Pause button only pauses, never resumes
@@ -687,6 +741,12 @@ func _on_pause_pressed():
 		EditorData.is_playing = false
 		playback_position = EditorData.current_time
 		audio_player.stop()
+		
+		# Stop audio generator players
+		if metronome_player:
+			metronome_player.stop()
+		if note_hit_player:
+			note_hit_player.stop()
 
 func toggle_playback():
 	# Toggle between play and pause
@@ -722,6 +782,13 @@ func stop_playback():
 	# Full stop - reset to beginning
 	EditorData.is_playing = false
 	audio_player.stop()
+	
+	# Stop audio generator players
+	if metronome_player:
+		metronome_player.stop()
+	if note_hit_player:
+		note_hit_player.stop()
+	
 	playback_position = 0.0
 	EditorData.current_time = 0.0
 	EditorData.playback_position_changed.emit(0.0)
@@ -738,11 +805,22 @@ func seek_to_time(time_seconds: float):
 	EditorData.current_time = playback_position
 	EditorData.playback_position_changed.emit(playback_position)
 	
+	# Reset tracking for metronome and note hits
+	last_metronome_beat = -1
+	triggered_notes.clear()
+	
 	if was_playing:
+		# Ensure audio generator players are running
+		if metronome_player and not metronome_player.playing:
+			metronome_player.play()
+		if note_hit_player and not note_hit_player.playing:
+			note_hit_player.play()
+		
 		# Resume playback from new position (with audio offset)
 		var audio_start_position = max(0.0, playback_position - EditorData.audio_offset)
 		audio_player.play(audio_start_position)
-		time_begin = Time.get_ticks_usec() - int(playback_position * 1_000_000.0)
+		# Account for playback speed when setting time_begin
+		time_begin = Time.get_ticks_usec() - int((playback_position / EditorData.playback_speed) * 1_000_000.0)
 		time_delay = AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()
 	
 	update_time_display()
@@ -770,6 +848,14 @@ func _process(delta):
 			EditorData.current_time = time
 			EditorData.playback_position_changed.emit(time)
 			
+			# Handle metronome clicks
+			if EditorData.metronome_enabled:
+				handle_metronome(time)
+			
+			# Handle note hit sounds
+			if EditorData.note_hits_enabled:
+				handle_note_hits(time)
+			
 			# Auto-scroll timeline
 			update_timeline_scroll()
 			
@@ -787,7 +873,7 @@ func update_time_display():
 	if time_label and audio_player.stream:
 		var current = format_time(EditorData.current_time)
 		var total = format_time(get_audio_duration())
-		time_label.text = "%s / %s" % [current, total]
+		time_label.text = "%s/%s" % [current, total]  # Compact format without spaces
 
 func format_time(seconds: float) -> String:
 	var mins = int(seconds) / 60
@@ -1070,3 +1156,217 @@ func int_to_variable_length(value: int) -> PackedByteArray:
 		value >>= 7
 	
 	return bytes
+
+func setup_metronome_toggle():
+	# Create metronome toggle in toolbar2
+	metronome_toggle = CheckButton.new()
+	
+	# Try to load metronome icon
+	var metronome_icon = load("res://resources/metronome.png")
+	if metronome_icon:
+		metronome_toggle.icon = metronome_icon
+
+	else:
+		metronome_toggle.text = "🎵"  # Fallback to music note
+	
+	metronome_toggle.button_pressed = false
+	metronome_toggle.tooltip_text = "Metronome click during playback"
+	metronome_toggle.toggled.connect(_on_metronome_toggled)
+	tool_bar_2.add_child(metronome_toggle)
+	
+	# Volume slider for metronome
+	metronome_volume_slider = HSlider.new()
+	metronome_volume_slider.min_value = 0
+	metronome_volume_slider.max_value = 100
+	metronome_volume_slider.step = 1
+	metronome_volume_slider.value = 50
+	metronome_volume_slider.custom_minimum_size = Vector2(60, 32)
+	metronome_volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	metronome_volume_slider.tooltip_text = "Metronome volume"
+	metronome_volume_slider.value_changed.connect(_on_metronome_volume_changed)
+	tool_bar_2.add_child(metronome_volume_slider)
+
+func _on_metronome_volume_changed(value: float):
+	if metronome_player:
+		if value <= 0:
+			metronome_player.volume_db = -80
+		else:
+			# Boost volume: 0 dB at 50%, up to +10 dB at 100%
+			metronome_player.volume_db = linear_to_db(value / 100.0) + 5
+
+func _on_metronome_toggled(enabled: bool):
+	EditorData.metronome_enabled = enabled
+
+func setup_note_hits_toggle():
+	# Create note hits toggle in toolbar2
+	note_hits_toggle = CheckButton.new()
+	note_hits_toggle.text = "♪"  # Single music note
+	note_hits_toggle.button_pressed = false
+	note_hits_toggle.tooltip_text = "Play sound when notes trigger during playback"
+	note_hits_toggle.toggled.connect(_on_note_hits_toggled)
+	tool_bar_2.add_child(note_hits_toggle)
+	
+	# Volume slider for note hits
+	note_hits_volume_slider = HSlider.new()
+	note_hits_volume_slider.min_value = 0
+	note_hits_volume_slider.max_value = 100
+	note_hits_volume_slider.step = 1
+	note_hits_volume_slider.value = 40
+	note_hits_volume_slider.custom_minimum_size = Vector2(60, 32)
+	note_hits_volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	note_hits_volume_slider.tooltip_text = "Note hit volume"
+	note_hits_volume_slider.value_changed.connect(_on_note_hits_volume_changed)
+	tool_bar_2.add_child(note_hits_volume_slider)
+
+func _on_note_hits_volume_changed(value: float):
+	if note_hit_player:
+		if value <= 0:
+			note_hit_player.volume_db = -80
+		else:
+			# Boost volume: 0 dB at 50%, up to +6 dB at 100%
+			note_hit_player.volume_db = linear_to_db(value / 100.0) + 3
+
+func _on_note_hits_toggled(enabled: bool):
+	EditorData.note_hits_enabled = enabled
+
+func setup_time_signature_controls():
+	# Create label with symbol
+	var label = Label.new()
+	label.text = "♩"  # Quarter note
+	label.add_theme_font_size_override("font_size", 16)
+	label.tooltip_text = "Time signature"
+	tool_bar_2.add_child(label)
+	
+	# Create numerator spinbox
+	time_sig_numerator = SpinBox.new()
+	time_sig_numerator.min_value = 1
+	time_sig_numerator.max_value = 32
+	time_sig_numerator.value = 4
+	time_sig_numerator.custom_minimum_size = Vector2(50, 0)
+	time_sig_numerator.tooltip_text = "Beats per measure"
+	time_sig_numerator.value_changed.connect(_on_time_signature_changed)
+	tool_bar_2.add_child(time_sig_numerator)
+	
+	# Create separator label
+	var slash = Label.new()
+	slash.text = "/"
+	slash.add_theme_font_size_override("font_size", 14)
+	tool_bar_2.add_child(slash)
+	
+	# Create denominator spinbox  
+	time_sig_denominator = SpinBox.new()
+	time_sig_denominator.min_value = 1
+	time_sig_denominator.max_value = 64
+	time_sig_denominator.value = 4
+	time_sig_denominator.custom_minimum_size = Vector2(50, 0)
+	time_sig_denominator.tooltip_text = "Beat unit (4 = quarter note, 8 = eighth note)"
+	time_sig_denominator.value_changed.connect(_on_time_signature_changed)
+	tool_bar_2.add_child(time_sig_denominator)
+
+func _on_time_signature_changed(_value: float):
+	EditorData.time_signature_numerator = int(time_sig_numerator.value)
+	EditorData.time_signature_denominator = int(time_sig_denominator.value)
+	EditorData.time_signature_changed.emit(EditorData.time_signature_numerator, EditorData.time_signature_denominator)
+	timeline_canvas.queue_redraw()
+
+func setup_audio_players():
+	# Create metronome audio player
+	metronome_player = AudioStreamPlayer.new()
+	add_child(metronome_player)
+	
+	# Generate a simple click sound (sine wave beep)
+	var click_stream = AudioStreamGenerator.new()
+	click_stream.mix_rate = 22050
+	click_stream.buffer_length = 0.05  # 50ms click
+	metronome_player.stream = click_stream
+	metronome_player.volume_db = 0  # Default volume, controlled by slider
+	
+	# Create note hit audio player
+	note_hit_player = AudioStreamPlayer.new()
+	add_child(note_hit_player)
+	
+	# Use same click sound for note hits
+	var hit_stream = AudioStreamGenerator.new()
+	hit_stream.mix_rate = 22050
+	hit_stream.buffer_length = 0.03  # 30ms click
+	note_hit_player.stream = hit_stream
+	note_hit_player.volume_db = 0  # Default volume, controlled by slider
+	
+	# Apply initial volume from sliders
+	_on_metronome_volume_changed(50)  # Default 50%
+	_on_note_hits_volume_changed(40)  # Default 40%
+
+func handle_metronome(time: float):
+	if not metronome_player:
+		return
+	
+	var current_beat = EditorData.seconds_to_beats(time)
+	var beat_number = int(floor(current_beat))
+	
+	# Play click on each beat
+	if beat_number != last_metronome_beat and beat_number >= 0:
+		last_metronome_beat = beat_number
+		
+		# Play metronome click using AudioStreamGeneratorPlayback
+		var playback: AudioStreamGeneratorPlayback = metronome_player.get_stream_playback()
+		if playback:
+			# Generate sharp, clicky sound
+			var sample_rate = 22050.0
+			var click_samples = int(sample_rate * 0.003)  # 3ms for sharp click
+			
+			# Check if on downbeat (first beat of measure)
+			var beats_per_measure = EditorData.get_beats_per_measure()
+			var beat_in_measure = fmod(current_beat, beats_per_measure)
+			
+			# Downbeat is higher pitch
+			var freq = 800.0  # Regular beat
+			if beat_in_measure < 0.5:  # First beat of measure
+				freq = 1200.0  # Downbeat
+			
+			# Sharp click with quick decay envelope
+			for i in range(click_samples):
+				var t = float(i) / sample_rate
+				var envelope = 1.0 - (float(i) / click_samples)  # Quick decay
+				var sample = sin(2.0 * PI * freq * t) * envelope * 0.4
+				playback.push_frame(Vector2(sample, sample))
+
+func handle_note_hits(time: float):
+	if not note_hit_player:
+		return
+	
+	var current_beat = EditorData.seconds_to_beats(time)
+	
+	# Check for notes that should trigger
+	for note in EditorData.notes:
+		# Only trigger for edge notes (8-19) and center note (7)
+		if note.lane < 7 or note.lane > 19:
+			continue
+		
+		# Skip if already triggered
+		if note in triggered_notes:
+			continue
+		
+		# Check if note should trigger now
+		if note.beat_position <= current_beat and note.beat_position + 0.1 >= current_beat:
+			triggered_notes.append(note)
+			
+			# Play note hit sound
+			var playback: AudioStreamGeneratorPlayback = note_hit_player.get_stream_playback()
+			if playback:
+				# Generate higher-pitched, punchier beep
+				var sample_rate = 22050.0
+				var hit_samples = int(sample_rate * 0.008)  # 8ms for punchier sound
+				var freq = 900.0  # Higher base frequency
+				
+				# Vary pitch based on lane
+				if note.lane >= 8 and note.lane <= 19:  # Edge notes
+					freq += (note.lane - 13) * 60  # More pitch variation
+				elif note.lane == 7:  # Center note
+					freq = 1000.0
+				
+				# Punchier envelope with quicker attack
+				for i in range(hit_samples):
+					var t = float(i) / sample_rate
+					var envelope = 1.0 - pow(float(i) / hit_samples, 0.3)  # Less gentle decay
+					var sample = sin(2.0 * PI * freq * t) * envelope * 0.4  # Louder amplitude
+					playback.push_frame(Vector2(sample, sample))

@@ -266,13 +266,13 @@ func draw_ruler():
 	var visible_start_beat = pixel_to_beat(scroll_offset + LABEL_WIDTH)
 	var visible_end_beat = pixel_to_beat(scroll_offset + size.x)
 	
-	# Draw bar markers and labels
-	var beats_per_bar = 4  # 4/4 time signature
-	var start_bar = floor(visible_start_beat / beats_per_bar)
-	var end_bar = ceil(visible_end_beat / beats_per_bar) + 1
+	# Draw bar markers and labels using time signature
+	var beats_per_measure = EditorData.get_beats_per_measure()
+	var start_bar = floor(visible_start_beat / beats_per_measure)
+	var end_bar = ceil(visible_end_beat / beats_per_measure) + 1
 	
 	for bar_num in range(start_bar, end_bar):
-		var beat = bar_num * beats_per_bar
+		var beat = bar_num * beats_per_measure
 		var x = beat_to_pixel(beat)
 		
 		if x < LABEL_WIDTH:
@@ -290,8 +290,9 @@ func draw_ruler():
 		var timecode = format_timecode(time_at_bar)
 		draw_string(font, Vector2(x + 5, current_waveform_height + 28), timecode, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.8, 0.8, 0.8))
 		
-		# Draw minor ticks (beat lines within bar)
-		for beat_offset in range(1, beats_per_bar):
+		# Draw minor ticks (beat lines within measure)
+		var num_beats = int(ceil(beats_per_measure))
+		for beat_offset in range(1, num_beats):
 			var minor_beat = beat + beat_offset
 			var minor_x = beat_to_pixel(minor_beat)
 			
@@ -305,8 +306,10 @@ func draw_ruler():
 	var label_rect = Rect2(scroll_offset, current_waveform_height, LABEL_WIDTH, RULER_HEIGHT)
 	draw_rect(label_rect, Color(0.15, 0.15, 0.15, 0.95), true)
 	
-	# Draw "Timeline" label
-	draw_string(font, Vector2(scroll_offset + 5, current_waveform_height + 20), "Timeline", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+	# Draw "Timeline" label with time signature
+	var time_sig_label = "%d/%d" % [EditorData.time_signature_numerator, EditorData.time_signature_denominator]
+	draw_string(font, Vector2(scroll_offset + 5, current_waveform_height + 15), "Timeline", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+	draw_string(font, Vector2(scroll_offset + 5, current_waveform_height + 28), time_sig_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.8, 0.8, 0.8))
 
 func format_timecode(seconds: float) -> String:
 	var mins = int(seconds) / 60
@@ -448,6 +451,8 @@ func draw_grid():
 	var start_line = floor(visible_start_beat / division_size)
 	var end_line = ceil(visible_end_beat / division_size)
 	
+	var beats_per_measure = EditorData.get_beats_per_measure()
+	
 	for i in range(start_line, end_line + 1):
 		var beat = i * division_size
 		var x = beat_to_pixel(beat)
@@ -458,13 +463,19 @@ func draw_grid():
 		var color: Color
 		var width: float
 		
-		if int(beat) == beat and int(beat) % 4 == 0:
+		# Check if this is a measure line (start of measure)
+		var is_measure_line = abs(fmod(beat, beats_per_measure)) < 0.001
+		
+		if is_measure_line:
+			# Measure line - thick and bright
 			color = Color(0.7, 0.7, 0.7, 0.8)
 			width = 2.0
 		elif int(beat) == beat:
+			# Beat line
 			color = Color(0.5, 0.5, 0.5, 0.6)
 			width = 1.5
 		else:
+			# Subdivision line
 			color = Color(0.3, 0.3, 0.3, 0.4)
 			width = 1.0
 		
