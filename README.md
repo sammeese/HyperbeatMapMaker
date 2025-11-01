@@ -19,10 +19,7 @@ Extract and run the exe
 
 ##  Known issues/Planned changes:
 
-Vibe settings
-
-Time signature setting
-
+idk somethings probably broken, but i dont know about it yet lol
 
 
 **Please direct any issues and suggestions to @soothsayer on discord, my DMs are open and I am in the hyperbeat discord also.**
